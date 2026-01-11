@@ -5,6 +5,7 @@
 
 #include "DataStructures/DataBox/Tag.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
+#include <vector>
 
 /// \cond
 class ComplexDataVector;
@@ -39,6 +40,14 @@ namespace ScalarSelfForce::Tags {
  */
 struct MMode : db::SimpleTag {
   using type = Scalar<ComplexDataVector>;
+};
+
+struct NMode : db::SimpleTag {
+  using type = Scalar<ComplexDataVector>;
+};
+
+struct EffectiveSourceEvolution : db::SimpleTag {
+  using type = std::vector<Scalar<ComplexDataVector>>;
 };
 
 /*!

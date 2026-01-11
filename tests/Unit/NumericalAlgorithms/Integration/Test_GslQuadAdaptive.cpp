@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <vector>
+#include <iostream>
 
 #include "Framework/TestHelpers.hpp"
 #include "NumericalAlgorithms/Integration/GslQuadAdaptive.hpp"
@@ -44,6 +45,7 @@ SPECTRE_TEST_CASE("Unit.Numerical.Integration.GslQuadAdaptive",
     const auto result = integration(
         [&mean, &factor](const double x) { return gaussian(x, mean, factor); },
         lower_boundary, upper_boundary, absolute_tolerance, 4);
+    std::cout << result << "\n";
     // [integration_example]
     CHECK(result == custom_approx(factor * erf(upper_boundary - mean) -
                                   factor * erf(lower_boundary - mean)));

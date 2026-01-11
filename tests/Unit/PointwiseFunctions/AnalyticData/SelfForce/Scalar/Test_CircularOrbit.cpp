@@ -30,6 +30,8 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.CircularOrbit",
   // applied to the singular field gives the effective source.
   // This is done numerically on a rectangular grid in (r_*, cos(theta)) near
   // the puncture.
+
+  // Set up a domain 
   const double costheta_offset = 0.1;
   const double delta_costheta = 0.2;
   const double rstar_offset = 0.;
@@ -61,21 +63,23 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.CircularOrbit",
   for (int m_mode_number = 0; m_mode_number < 3; ++m_mode_number) {
     CAPTURE(m_mode_number);
     const auto circular_orbit =
-        CircularOrbit{1., 0.9, 6., m_mode_number, {{-25., -5., 20., 40.}}};
+        CircularOrbit{1., 0.9, 6., m_mode_number, {{-25., -5., 20., 40.}}, false};
     CAPTURE(circular_orbit.puncture_position());
     const auto background =
         circular_orbit.variables(x, CircularOrbit::background_tags{});
     const auto& alpha = get<Tags::Alpha>(background);
     const auto& beta = get<Tags::Beta>(background);
     const auto& gamma = get<Tags::Gamma>(background);
-    const auto vars = circular_orbit.variables(x, CircularOrbit::source_tags{});
+    const auto vars = circular_orbit.variables(x, CircularOrbit::source_tags{}); 
     const auto& singular_field = get<Tags::SingularField>(vars);
     const auto& deriv_singular_field = get<
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(
         vars);
     const auto& effective_source = get<::Tags::FixedSource<Tags::MMode>>(vars);
 
-    // Take numeric derivative
+    double mass = circular_orbit.black_hole_mass();
+
+    // Take numeric derivative (this is the test to compare the result provided by effective source against the derivative of singular field)
     const auto numeric_deriv_singular_field =
         partial_derivative(singular_field, mesh, inv_jacobian);
     const Approx custom_approx = Approx::custom().epsilon(1.e-10).scale(1.);
@@ -91,7 +95,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.CircularOrbit",
     auto scalar_eqn = divergence(flux_singular_field, mesh, inv_jacobian);
     get(scalar_eqn) *= -1.;
     ScalarSelfForce::Sources::apply(make_not_null(&scalar_eqn), beta, gamma,
-                                    singular_field, flux_singular_field);
+                                    singular_field, deriv_singular_field,flux_singular_field);
     // Minus sign is from the definition of the effective source:
     //   \psi = \psi_R + \psi_P = 0
     // where \psi_R is the regular part and \psi_P is the singular part

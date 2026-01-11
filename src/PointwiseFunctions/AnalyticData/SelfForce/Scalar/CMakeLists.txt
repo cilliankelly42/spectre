@@ -5,10 +5,19 @@ set(LIBRARY ScalarSelfForceAnalyticData)
 
 add_spectre_library(${LIBRARY})
 
+#target_compile_options(
+#  ${LIBRARY}
+#  PRIVATE
+#  -g
+#  -O0
+#  -fno-inline
+#)
+
 spectre_target_sources(
   ${LIBRARY}
   PRIVATE
   CircularOrbit.cpp
+  EccentricOrbit.cpp
   )
 
 spectre_target_headers(
@@ -27,6 +36,7 @@ target_link_libraries(
   GeneralRelativity
   Options
   Utilities
+  KerrGeodesicsC
   )
 
 add_subdirectory(Python)
