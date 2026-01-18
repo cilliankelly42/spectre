@@ -20,11 +20,6 @@
 #include "Utilities/Gsl.hpp"
 #include "Utilities/Math.hpp"
 #include "Utilities/Serialization/PupStlCpp17.hpp"
-/*
-extern "C"{
-#include "korb.h"
-}
-*/
 
 namespace ScalarSelfForce::AnalyticData {
 
@@ -80,7 +75,7 @@ CircularOrbit::variables(const tnsr::I<DataVector, 2>& x,
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
   const double r_minus = M * (1. - sqrt(1. - square(black_hole_spin_)));
   const double r_0 = orbital_radius_;
-  const double omega = 1. / (a + sqrt(cube(r_0) / M)); // This needs to be called in as a number from Tommys KerrGeodesicsC Trajectory
+  const double omega = 1. / (a + sqrt(cube(r_0) / M));
   const auto& r_star = get<0>(x);
   const auto& cos_theta_or_sq = get<1>(x);
   DataVector cos_theta_sq;
@@ -231,9 +226,9 @@ CircularOrbit::variables(
   tuples::TaggedTuple<
       ::Tags::FixedSource<Tags::MMode>, Tags::SingularField,
       ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
-      Tags::BoyerLindquistRadius> // tuples is a namespace which is used for handling tuples (Here the variable result is being declared as a custom made type)
+      Tags::BoyerLindquistRadius>
       result{};
-  get(get<Tags::BoyerLindquistRadius>(result)) = r; // index the result variable with tags (this is explained in TaggedTuple.hpp where the the class TaggedTuple is defined)
+  get(get<Tags::BoyerLindquistRadius>(result)) = r;
   const size_t num_points = get<0>(x).size();
   Scalar<ComplexDataVector>& effective_source =
       get<::Tags::FixedSource<Tags::MMode>>(result);
@@ -257,8 +252,9 @@ CircularOrbit::variables(
       x_i.r = r[i];
       x_i.theta = acos(cos_theta[i]);
       x_i.phi = 0;
-      effsource_calc_m_circular(m_mode_number_, &x_i, PhiS.data(), dPhiS_dx.data(),
-                       d2PhiS_dx2.data(), src.data()); // Replace this with Barry's eccentric effective source (and will also have to multipy by the factor of exp(i m Omega_phi t) to remove the secular phi growth from the m-mode)
+      effsource_calc_m_circular(m_mode_number_, &x_i,
+          PhiS.data(), dPhiS_dx.data(),
+          d2PhiS_dx2.data(), src.data());
       get(effective_source)[i] = src[0] + std::complex<double>(0., 1.) * src[1];
       get(singular_field)[i] = PhiS[0] + std::complex<double>(0., 1.) * PhiS[1];
       get<0>(deriv_singular_field)[i] =

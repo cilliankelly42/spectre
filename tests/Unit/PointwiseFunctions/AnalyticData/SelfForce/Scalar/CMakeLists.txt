@@ -3,19 +3,20 @@
 
 set(LIBRARY "Test_ScalarSelfForceAnalyticData")
 
-set(LIBRARY_SOURCES 
-    Test_EccentricOrbit.cpp
+set(LIBRARY_SOURCES
+  #Test_CircularOrbit.cpp
+  Test_EccentricOrbit.cpp
   )
 
 add_test_library(${LIBRARY} "${LIBRARY_SOURCES}")
 
-#target_compile_options(
-#  ${LIBRARY}
-#  PRIVATE
-#  -g
-#  -O0
-# -fno-inline
-#)
+target_compile_options(
+  ${LIBRARY}
+  PRIVATE
+  -g
+  -O0
+  -fno-inline
+)
 
 target_link_libraries(
   ${LIBRARY}
@@ -28,5 +29,5 @@ target_link_libraries(
   DomainCreators
   LinearOperators
   KerrGeodesicsC
-  Integration 
+  Integration
   )

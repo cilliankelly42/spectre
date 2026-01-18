@@ -372,7 +372,7 @@ void effsource_calc_m_circular(int m, struct coordinate * x,
   const double theta  = x->theta;
   const double rp     = xp.r;
   const double thetap = xp.theta;
-  const double om       = M / (a*M + sqrt(M*pow(rp,3)));
+  const double om = M / (a*M + sqrt(M*pow(rp,3)));
 
   const double dr     = r - rp;
   const double dtheta = theta - thetap;

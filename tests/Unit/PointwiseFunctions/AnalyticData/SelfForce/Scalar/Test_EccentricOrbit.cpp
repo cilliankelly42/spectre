@@ -1,9 +1,12 @@
 // Distributed under the MIT License.
 // See LICENSE.txt for details.
 
+#include "Elliptic/Systems/SelfForce/Scalar/Tags.hpp"
 #include "Framework/TestingFramework.hpp"
 
+#include <algorithm>
 #include <array>
+#include <catch2/catch_message.hpp>
 #include <complex>
 #include <cstddef>
 #include <iostream>
@@ -20,6 +23,7 @@
 #include "NumericalAlgorithms/Spectral/LogicalCoordinates.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
 #include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
+#include "Utilities/DereferenceWrapper.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
@@ -27,8 +31,7 @@ namespace ScalarSelfForce::AnalyticData {
 
 SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.Basic_Test",
                   "[PointwiseFunctions][Unit]") {
-
-  // Set up a domain 
+  // Set up a domain
   const double costheta_offset = 0.1;
   const double delta_costheta = 0.2;
   const double rstar_offset = 0.;
@@ -56,92 +59,60 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.Basic_Test",
   CAPTURE(min(cos_theta));
   CAPTURE(max(cos_theta));
 
-  
-  
-  /*
-  variables function needs to return the evolution of the m_mode effective_source. Then each element of that array is the value of the m_mode_effective_source at the given value of t_values 
-  Then loop over the t_values and for each t_value compute the resummation and look at the difference between that and the value of the effective source
-  */
-
-  int m_mode_number = 0;
-  const auto eccentric_orbit = EccentricOrbit{1., 0.9, 10., 0.6 , m_mode_number, 0 /*n_mode number irrelevant here because object only created to call compute_trajectory()*/, {{-25., -5., 20., 40.}}, false};
+  int m_mode_number = 1;
+  int max_n_mode_number = 30;
+  auto eccentric_orbit = EccentricOrbit{
+      1., 0.9, 10., 0.6, m_mode_number, 0, {{-25., -5., 20., 40.}}, false};
   eccentric_orbit.compute_trajectory();
-
-  // Create and fill an array of containing times at which to compute the resummation and compare with the original time series data
-  std::vector<size_t> time_indices = {100,200,300,400,500}; // Can randomly generate N integers in range (0, eccentric_orbit.t_values.size() - 1) in the future for a random test
+  decltype(eccentric_orbit.variables(x, EccentricOrbit::source_tags{})) vars;
+  // Select grid points [by index from 0 to get<0>(x).size()]
+  // to compare m-mode effective source and sum over n-modes
+  std::vector<size_t> grid_point_indices = {20};
+  // Select time points (by index from 0 to time_points)
+  // to compare m-mode effective source and sum over n-modes
+  std::vector<size_t> time_indices = {29};
   std::vector<double> t_values_to_test(time_indices.size());
-  for(size_t i=0; i < time_indices.size(); i++)
-  {
+  for (size_t i = 0; i < time_indices.size(); i++) {
     t_values_to_test[i] = eccentric_orbit.t_values[time_indices[i]];
   }
 
-  // Initialise n_mode_array to be zeros
-  Scalar<ComplexDataVector> n_mode_sum(get<0>(x).size(), std::complex<double>(0,0));
-  /*
-  std::vector<Scalar<ComplexDataVector>> n_mode_array(5 /*How many n_modes do you want to sum*/); 
-  for(auto& complex_data_vector : n_mode_array)
-  {
-    get(complex_data_vector) = ComplexDataVector(get<0>(x).size(), std::complex<double>(0,0));
-  }
-  */
-  // Compute n_mode resummation for each time and make sure difference is zero up to specified tolerance
-  
-  for(size_t t : time_indices)
-  {
-    for(size_t n_mode_number = 0; n_mode_number < n_mode_array.size(); n_mode_number++)
-    {
-      const auto eccentric_orbit = EccentricOrbit{1., 0.9, 10., 0.6 , m_mode_number, n_mode_number, {{-25., -5., 20., 40.}}, false};
-      const auto vars = eccentric_orbit.variables(x, EccentricOrbit::source_tags{}); 
+  const Approx custom_approx = Approx::custom().epsilon(1.e-6).scale(1.);
+
+  // Can test for multiple times by adding more indices to time_indices
+  for (size_t t : time_indices) {
+    Scalar<ComplexDataVector> n_mode_sum(get<0>(x).size(),
+                                         std::complex<double>(0, 0));
+    for (int n_mode_number = -max_n_mode_number;
+         n_mode_number <= max_n_mode_number; n_mode_number++) {
+      eccentric_orbit = EccentricOrbit{1.,
+                                       0.9,
+                                       10.,
+                                       0.6,
+                                       m_mode_number,
+                                       n_mode_number,
+                                       {{-25., -5., 20., 40.}},
+                                       false};
+      vars = eccentric_orbit.variables(x, EccentricOrbit::source_tags{});
       const auto& n_mode = get<Tags::NMode>(vars);
-      get(n_mode_sum) += 
-        get(n_mode) * exp(std::complex<double>(0, - (n_mode_number * eccentric_orbit.Omega_r + m_mode_number * eccentric_orbit.Omega_phi) * eccentric_orbit.t_values[t]));
-      get(n_mode_array[n_mode_number]) += 
-        get(n_mode) * exp(std::complex<double>(0, - (n_mode_number * eccentric_orbit.Omega_r + m_mode_number * eccentric_orbit.Omega_phi) * eccentric_orbit.t_values[t]));
+      get(n_mode_sum) +=
+          get(n_mode) * exp(std::complex<double>(
+                            0, -((n_mode_number * eccentric_orbit.Omega_r) +
+                                 (m_mode_number * eccentric_orbit.Omega_phi)) *
+                                   eccentric_orbit.t_values[t]));
     }
-    std::cout << get(n_mode_sum) << "\n\n";
-
-    /*
-      Compare with the current effective_source_evolution here 
-    */
-
+    CAPTURE(t);
+    // Can test for multiple grid points by
+    // adding more indices to grid_point_indices
+    for (size_t grid_index : grid_point_indices) {
+      CAPTURE(get(n_mode_sum)[grid_index]);
+      CAPTURE(get(get<Tags::EffectiveSourceEvolution>(vars)[t])[grid_index]);
+      CAPTURE(get(n_mode_sum)[grid_index] -
+              get(get<Tags::EffectiveSourceEvolution>(vars)[t])[grid_index]);
+      CHECK_ITERABLE_CUSTOM_APPROX(
+          get(n_mode_sum)[grid_index],
+          get(get<Tags::EffectiveSourceEvolution>(vars)[t])[grid_index],
+          custom_approx);
+    }
   }
-
-  /*
-  double r_plus = 1 + sqrt(1 - 0.9*0.9);
-  std::cout << gr::boyer_lindquist_radius_minus_r_plus_from_tortoise(get<0>(x), 1, 0.9)[30] + r_plus << "\n";
-  std::cout << cos_theta[30] << "\n";
-  std::cout << get(n_mode)[30] << "\n";
-*/
-
-  // Loop and sum over n-modes to check convergence to time series data within a certain tolerance 
-
-  //std::vector<Scalar<ComplexDataVector>> n_mode_array(1); 
-  //Scalar<ComplexDataVector> n_mode_summand(get<0>(x).size()); // n_mode_summand is an array storing Seff_nm* exp(-in OMega_r t) where each outer element in the vector is for each n from 0 to n_max
-  /*
-  for(size_t n_mode_number = 0; n_mode_number < n_mode_array.size(); n_mode_number++)
-  {
-    const auto eccentric_orbit = EccentricOrbit{1., 0.9, 10., 0.6 , m_mode_number, n_mode_number, {{-25., -5., 20., 40.}}, false};
-    eccentric_orbit.compute_trajectory();
-    const auto vars = eccentric_orbit.variables(x, EccentricOrbit::source_tags{}); 
-    const auto& n_mode = get<Tags::NMode>(vars);
-    auto n_mode_summand = [&n_mode, &n_mode_number, &eccentric_orbit](double t){ return get(n_mode) * exp(std::complex<double>(0, - n_mode_number * eccentric_orbit.Omega_r * t)); };
-    //std::cout << n_mode_summand(2) << "\n\n";
-    Scalar<ComplexDataVector>& test_n_mode_type = n_mode_summand(2);
-    //n_mode_array[n_mode_number] = n_mode_summand(10); 
-  }
-  */
-
-  //std::cout << get(n_mode_array[0]) * exp(std::complex<double>(0, )) << "\n";
-
-  /*
-  Scalar<ComplexDataVector> resummed_n_modes;
-  get(resummed_n_modes).destructive_resize(get<0>(x).size());
-  std::cout << get(resummed_n_modes) << "\n";
-  for(size_t i=0; i < n_mode_array.size(); i++)
-  {
-    get(resummed_n_modes) += get(n_mode_array[i]);
-  }
-  std::cout << get(resummed_n_modes) << "\n";
-*/
 }
-}
+}  // Namespace ScalarSelfForce::AnalyticData

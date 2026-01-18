@@ -43,7 +43,7 @@ SPECTRE_TEST_CASE("Unit.Numerical.Integration.GslQuadAdaptive",
     const double lower_boundary = -4.;
     const double upper_boundary = 10.;
     const auto result = integration(
-        [&mean, &factor](const double x) { return gaussian(x, mean, factor); },
+        [&mean, &factor](const double x){ return gaussian(x, mean, factor); },
         lower_boundary, upper_boundary, absolute_tolerance, 4);
     std::cout << result << "\n";
     // [integration_example]

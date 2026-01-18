@@ -24,6 +24,7 @@ set(SPECTRE_FORMALINE_LOCATIONS
   Metadata.yaml
   pyproject.toml
   README.md
+  runs
   setup.cfg
   src
   support
