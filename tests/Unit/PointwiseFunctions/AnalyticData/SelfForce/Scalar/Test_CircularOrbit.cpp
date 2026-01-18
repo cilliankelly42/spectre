@@ -62,17 +62,15 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.CircularOrbit",
   // Get the analytic fields
   for (int m_mode_number = 0; m_mode_number < 3; ++m_mode_number) {
     CAPTURE(m_mode_number);
-    const auto circular_orbit =
-        CircularOrbit{1., 0.9, 6., m_mode_number,
-{{-25., -5., 20., 40.}}, false};
+    const auto circular_orbit = CircularOrbit{
+        1., 0.9, 6., m_mode_number, {{-25., -5., 20., 40.}}, false};
     CAPTURE(circular_orbit.puncture_position());
     const auto background =
         circular_orbit.variables(x, CircularOrbit::background_tags{});
     const auto& alpha = get<Tags::Alpha>(background);
     const auto& beta = get<Tags::Beta>(background);
     const auto& gamma = get<Tags::Gamma>(background);
-    const auto vars = circular_orbit.variables(
-x, CircularOrbit::source_tags{});
+    const auto vars = circular_orbit.variables(x, CircularOrbit::source_tags{});
     const auto& singular_field = get<Tags::SingularField>(vars);
     const auto& deriv_singular_field = get<
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(
@@ -96,8 +94,8 @@ x, CircularOrbit::source_tags{});
     auto scalar_eqn = divergence(flux_singular_field, mesh, inv_jacobian);
     get(scalar_eqn) *= -1.;
     ScalarSelfForce::Sources::apply(make_not_null(&scalar_eqn), beta, gamma,
-singular_field, deriv_singular_field,
-flux_singular_field);
+                                    singular_field, deriv_singular_field,
+                                    flux_singular_field);
     // Minus sign is from the definition of the effective source:
     //   \psi = \psi_R + \psi_P = 0
     // where \psi_R is the regular part and \psi_P is the singular part
