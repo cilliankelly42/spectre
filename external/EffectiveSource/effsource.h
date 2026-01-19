@@ -9,8 +9,8 @@ struct coordinate {
   double t;
 };
 
-void effsource_init(double M, double a);
-void effsource_set_particle(struct coordinate * x_p, double e, double l, double ur_p);
+void effsource_init_circular(double mass, double spin);
+void effsource_set_particle_circular(struct coordinate * x_p, double e, double l, double ur_p);
 
 void effsource_PhiS_circular(struct coordinate * x, double * PhiS);
 void effsource_calc_circular(struct coordinate * x,
@@ -19,6 +19,10 @@ void effsource_calc_circular(struct coordinate * x,
 void effsource_PhiS_m_circular(int m, struct coordinate * x, double * PhiS);
 void effsource_calc_m_circular(int m, struct coordinate * x,
   double * PhiS, double * dPhiS_dx, double * d2PhiS_dx2, double * src);
+
+
+void effsource_init(double mass, double spin);
+void effsource_set_particle(struct coordinate * x_p, double e, double l, double ur_p);
 
 void effsource_PhiS(struct coordinate * x, double * PhiS);
 void effsource_calc(struct coordinate * x,

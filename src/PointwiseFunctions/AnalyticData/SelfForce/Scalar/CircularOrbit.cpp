@@ -166,7 +166,7 @@ CircularOrbit::variables(
 
   {
     // Initialize effsource
-    effsource_init(M, a);
+    effsource_init_circular(M, a);
     coordinate xp{};
     xp.t = 0;
     xp.r = r_0;
@@ -179,7 +179,7 @@ CircularOrbit::variables(
     const double l = (M * (a * a + r_0 * r_0 - 2.0 * a * sqrt(M * r_0))) /
                      (sqrt(M * r_0) * sqrt(r_0 * r_0 - 3.0 * M * r_0 +
                                            2.0 * a * sqrt(M * r_0)));
-    effsource_set_particle(&xp, e, l, 0.);
+    effsource_set_particle_circular(&xp, e, l, 0.);
   }
   const auto& r_star = get<0>(x);
   if (hyperboloidal_slicing_transitions_.has_value() and
