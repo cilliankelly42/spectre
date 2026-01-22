@@ -156,7 +156,7 @@ EccentricOrbit::variables(const tnsr::I<DataVector, 2>& x,
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
   const double r_minus = M * (1. - sqrt(1. - square(black_hole_spin_)));
   compute_trajectory();
-  const double r_0 = semi_latus_rectum_;
+  const double r_0 = semi_latus_rectum_;  // Adjust for AMR
   const auto& r_star = get<0>(x);
   const auto& cos_theta_or_sq = get<1>(x);
   DataVector cos_theta_sq;
@@ -365,7 +365,6 @@ EccentricOrbit::variables(
       im_gridpoint_to_interpolate[j] =
           get(effective_source_evolution[j])[i].imag();
     }
-
     intrp::CubicSpline re_interpolated_gridpoint{t_values,
                                                  re_gridpoint_to_interpolate};
     intrp::CubicSpline im_interpolated_gridpoint{t_values,
