@@ -46,6 +46,18 @@ struct NMode : db::SimpleTag {
   using type = Scalar<ComplexDataVector>;
 };
 
+struct SingularFieldEvolution: db::SimpleTag {
+  using type = std::vector<Scalar<ComplexDataVector>>;
+};
+
+struct RDerivSingularFieldEvolution: db::SimpleTag {
+  using type = std::vector<Scalar<ComplexDataVector>>;
+};
+
+struct ThetaDerivSingularFieldEvolution: db::SimpleTag {
+  using type = std::vector<Scalar<ComplexDataVector>>;
+};
+
 struct EffectiveSourceEvolution : db::SimpleTag {
   using type = std::vector<Scalar<ComplexDataVector>>;
 };

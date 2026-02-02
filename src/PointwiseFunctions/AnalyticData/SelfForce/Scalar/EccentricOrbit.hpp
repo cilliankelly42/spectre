@@ -10,7 +10,9 @@
 #include <pup.h>
 #include <vector>
 
+#include "DataStructures/ComplexDataVector.hpp"
 #include "DataStructures/DataBox/Prefixes.hpp"
+#include "DataStructures/Tensor/IndexType.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "Elliptic/Systems/SelfForce/Scalar/FirstOrderSystem.hpp"
 #include "Elliptic/Systems/SelfForce/Scalar/Tags.hpp"
@@ -55,7 +57,7 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
     using type = int;
   };
   struct NModeNumber {
-    static constexpr Options::String help = 
+    static constexpr Options::String help =
         "Radial mode number 'n' of the scalar field";
     using type = int;
   };
@@ -77,8 +79,9 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
     using type = bool;
   };
   using options =
-      tmpl::list<BlackHoleMass, BlackHoleSpin, SemiLatusRectum, Eccentricity, MModeNumber, NModeNumber,
-                 HyperboloidalSlicingTransitions, ImposeEquatorialSymmetry>;
+      tmpl::list<BlackHoleMass, BlackHoleSpin, SemiLatusRectum, Eccentricity,
+        MModeNumber, NModeNumber, HyperboloidalSlicingTransitions,
+        ImposeEquatorialSymmetry>;
   static constexpr Options::String help =
       "Quasicircular orbit of a scalar point charge in Kerr spacetime";
 
@@ -91,8 +94,8 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
 
   // Modify for Eccentric orbit
   EccentricOrbit(
-      double black_hole_mass, double black_hole_spin, double semi_latus_rectum, double eccentricity,
-      int m_mode_number, int n_mode_number, 
+      double black_hole_mass, double black_hole_spin, double semi_latus_rectum,
+      double eccentricity, int m_mode_number, int n_mode_number,
       std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions,
       bool impose_equatorial_symmetry);
 
@@ -118,12 +121,15 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
   using background_tags =
       typename ScalarSelfForce::FirstOrderSystem::background_fields;
   using source_tags = tmpl::list<
-      ::Tags::FixedSource<Tags::MMode>, 
+      ::Tags::FixedSource<Tags::MMode>,
       Tags::SingularField,
-      ::Tags::deriv<Tags::SingularField, 
+      ::Tags::deriv<Tags::SingularField,
       tmpl::size_t<2>, Frame::Inertial>,
-      Tags::BoyerLindquistRadius, 
+      Tags::BoyerLindquistRadius,
       Tags::NMode,
+      Tags::SingularFieldEvolution,
+      Tags::RDerivSingularFieldEvolution,
+      Tags::ThetaDerivSingularFieldEvolution,
       Tags::EffectiveSourceEvolution
       >;
 
@@ -148,7 +154,12 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
     return variables(x, tmpl::list<RequestedTags...>{});
   }
 
-  void compute_trajectory() const;
+  Scalar<ComplexDataVector> compute_n_mode(
+      std::vector<Scalar<ComplexDataVector>>& time_series_data,
+      size_t num_points,
+      double integral_tolerance);
+
+  void compute_trajectory(size_t time_points) const;
 
   // NOLINTNEXTLINE
   void pup(PUP::er& p) override;
@@ -174,7 +185,7 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
   std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions_{};
   bool impose_equatorial_symmetry_{false};
 
-  
+
 };
 
 bool operator!=(const EccentricOrbit& lhs, const EccentricOrbit& rhs);

@@ -3,6 +3,7 @@
 
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
 
+#include <blaze/math/Vector.h>
 #include <complex.h>
 #include <fftw3.h>
 #include <gsl/gsl_errno.h>
@@ -12,6 +13,7 @@
 #include <gsl/gsl_sf.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "DataStructures/Tensor/IndexType.hpp"
 extern "C" {
 #include "korb.h"
 }
@@ -85,21 +87,77 @@ tnsr::I<double, 2> EccentricOrbit::puncture_position() const {
   return tnsr::I<double, 2>{{{r_star, 0.}}};
 }
 
+
+
+//Function to compute n-modes of a time_series_data
+Scalar<ComplexDataVector> EccentricOrbit::compute_n_mode(
+    std::vector<Scalar<ComplexDataVector>>& time_series_data,
+    size_t num_points, double integral_tolerance)
+{
+  Scalar<ComplexDataVector> result;
+  get(result).destructive_resize(num_points);
+
+  std::vector<double> re_gridpoint_to_interpolate(t_values.size());
+  std::vector<double> im_gridpoint_to_interpolate(t_values.size());
+
+  for (size_t i = 0; i < num_points; i++)
+  {
+    for (size_t j = 0; j < t_values.size(); j++) {
+      re_gridpoint_to_interpolate[j] =
+          get(time_series_data[j])[i].real();
+      im_gridpoint_to_interpolate[j] =
+          get(time_series_data[j])[i].imag();
+    }
+    intrp::CubicSpline re_interpolated_gridpoint{t_values,
+                                                 re_gridpoint_to_interpolate};
+    intrp::CubicSpline im_interpolated_gridpoint{t_values,
+                                                 im_gridpoint_to_interpolate};
+
+    const integration::GslQuadAdaptive<
+        integration::GslIntegralType::StandardGaussKronrod>
+        integration{30};
+
+    double re_integral = integration(
+        [this, &re_interpolated_gridpoint,
+         &im_interpolated_gridpoint](double t) {
+          std::complex<double> phase_factor = std::exp(std::complex<double>(
+              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t));
+          return (1 / t_values[t_values.size() - 1]) *
+                 (re_interpolated_gridpoint(t) * phase_factor.real() -
+                  im_interpolated_gridpoint(t) * phase_factor.imag());
+        },
+        0, t_values[t_values.size() - 1], integral_tolerance, 4);
+
+    double im_integral = integration(
+        [this, &re_interpolated_gridpoint,
+         &im_interpolated_gridpoint](double t) {
+          std::complex<double> phase_factor = std::exp(std::complex<double>(
+              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t));
+          return (1 / t_values[t_values.size() - 1]) *
+                 (im_interpolated_gridpoint(t) * phase_factor.real() +
+                  re_interpolated_gridpoint(t) * phase_factor.imag());
+        },
+        0, t_values[t_values.size() - 1], integral_tolerance, 4);
+
+    get(result)[i] = std::complex<double>(re_integral, im_integral);
+  }
+  return result;
+}
+
 // Define the orbital parameters as global variables
 const int ecc = 1;
 const int inclined = 0;
-const double err = 1.0e-15;
+const double err = 1.0e-12;
 const double x_inclination = 1.0;
 korb_params orbpar;
 
-void EccentricOrbit::compute_trajectory() const {
+void EccentricOrbit::compute_trajectory(size_t time_points) const {
   korb_getparams(ecc, inclined, black_hole_spin_, semi_latus_rectum_,
                  eccentricity_, x_inclination, err, &orbpar);
   energy = orbpar.E;
   angular_momentum = orbpar.Lz;
   Omega_r = orbpar.wr;
   Omega_phi = orbpar.wphi;
-  size_t time_points = 100;
   r_of_t.resize(time_points);
   phi_of_t.resize(time_points);
   t_values.resize(time_points);
@@ -155,7 +213,7 @@ EccentricOrbit::variables(const tnsr::I<DataVector, 2>& x,
   const double M = black_hole_mass_;
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
   const double r_minus = M * (1. - sqrt(1. - square(black_hole_spin_)));
-  compute_trajectory();
+  compute_trajectory(10);
   const double r_0 = semi_latus_rectum_;  // Adjust for AMR
   const auto& r_star = get<0>(x);
   const auto& cos_theta_or_sq = get<1>(x);
@@ -232,14 +290,21 @@ tuples::TaggedTuple<Tags::MMode> EccentricOrbit::variables(
 tuples::TaggedTuple<
     ::Tags::FixedSource<Tags::MMode>, Tags::SingularField,
     ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
-    Tags::BoyerLindquistRadius, Tags::NMode, Tags::EffectiveSourceEvolution>
+    Tags::BoyerLindquistRadius, Tags::NMode,
+    Tags::SingularFieldEvolution,
+    Tags::RDerivSingularFieldEvolution,
+    Tags::ThetaDerivSingularFieldEvolution,
+    Tags::EffectiveSourceEvolution>
 EccentricOrbit::variables(
     const tnsr::I<DataVector, 2>& x,
     tmpl::list<
         ::Tags::FixedSource<Tags::MMode>, Tags::SingularField,
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
         Tags::BoyerLindquistRadius, Tags::NMode,
-        Tags::EffectiveSourceEvolution> /*meta*/) const {
+        Tags::SingularFieldEvolution,
+        Tags::RDerivSingularFieldEvolution,
+        Tags::ThetaDerivSingularFieldEvolution,
+        Tags::EffectiveSourceEvolution>/*meta*/) const {
   const double a = black_hole_spin_ * black_hole_mass_;
   const double M = black_hole_mass_;
   const double r_0 = semi_latus_rectum_;  // Set to rmin/rmax
@@ -291,22 +356,17 @@ EccentricOrbit::variables(
   tuples::TaggedTuple<
       ::Tags::FixedSource<Tags::MMode>, Tags::SingularField,
       ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
-      Tags::BoyerLindquistRadius, Tags::NMode, Tags::EffectiveSourceEvolution>
+      Tags::BoyerLindquistRadius, Tags::NMode, Tags::SingularFieldEvolution,
+      Tags::RDerivSingularFieldEvolution,
+      Tags::ThetaDerivSingularFieldEvolution,
+      Tags::EffectiveSourceEvolution>
       result{};
-  compute_trajectory();
+  compute_trajectory(10);
   get(get<Tags::BoyerLindquistRadius>(result)) = r;
   const size_t num_points = get<0>(x).size();
   Scalar<ComplexDataVector>& effective_source =
       get<::Tags::FixedSource<Tags::MMode>>(result);
   get(effective_source).destructive_resize(num_points);
-  Scalar<ComplexDataVector>& n_mode = get<Tags::NMode>(result);
-  get(n_mode).destructive_resize(num_points);
-  std::vector<Scalar<ComplexDataVector>>& effective_source_evolution =
-      get<Tags::EffectiveSourceEvolution>(result);
-  effective_source_evolution.resize(t_values.size());
-  for (auto& current_time : effective_source_evolution) {
-    get(current_time).destructive_resize(num_points);
-  }
   Scalar<ComplexDataVector>& singular_field = get<Tags::SingularField>(result);
   get(singular_field).destructive_resize(num_points);
   tnsr::i<ComplexDataVector, 2>& deriv_singular_field =
@@ -314,6 +374,33 @@ EccentricOrbit::variables(
           result);
   get<0>(deriv_singular_field).destructive_resize(num_points);
   get<1>(deriv_singular_field).destructive_resize(num_points);
+
+  std::vector<Scalar<ComplexDataVector>>& singular_field_evolution =
+    get<Tags::SingularFieldEvolution>(result);
+  std::vector<Scalar<ComplexDataVector>>& r_deriv_singular_field_evolution =
+    get<Tags::RDerivSingularFieldEvolution>(result);
+  std::vector<Scalar<ComplexDataVector>>& theta_deriv_singular_field_evolution =
+    get<Tags::ThetaDerivSingularFieldEvolution>(result);
+  std::vector<Scalar<ComplexDataVector>>& effective_source_evolution =
+      get<Tags::EffectiveSourceEvolution>(result);
+  // Resize the outer array in the time evolution data vectors
+  singular_field_evolution.resize(t_values.size());
+  r_deriv_singular_field_evolution.resize(t_values.size());
+  theta_deriv_singular_field_evolution.resize(t_values.size());
+  effective_source_evolution.resize(t_values.size());
+  //Resize the inner array in the time evolution data vectors
+  for (auto& inner_array : singular_field_evolution) {
+    get(inner_array).destructive_resize(num_points);
+  }
+  for (auto& inner_array : r_deriv_singular_field_evolution) {
+    get(inner_array).destructive_resize(num_points);
+  }
+  for (auto& inner_array : theta_deriv_singular_field_evolution) {
+    get(inner_array).destructive_resize(num_points);
+  }
+  for (auto& inner_array : effective_source_evolution) {
+    get(inner_array).destructive_resize(num_points);
+  }
 
   {
     // Call into effsource
@@ -350,53 +437,12 @@ EccentricOrbit::variables(
             dPhiS_dx[4] + std::complex<double>(0., 1.) * dPhiS_dx[5];
       }
 
+      get(singular_field_evolution[i]) = get(singular_field);
+      get(r_deriv_singular_field_evolution[i]) = get<0>(deriv_singular_field);
+      get(theta_deriv_singular_field_evolution[i]) =
+        get<1>(deriv_singular_field);
       get(effective_source_evolution[i]) = get(effective_source);
     }
-  }
-
-  // Compute n-modes
-  std::vector<double> re_gridpoint_to_interpolate(t_values.size());
-  std::vector<double> im_gridpoint_to_interpolate(t_values.size());
-
-  for (size_t i = 0; i < num_points; i++) {
-    for (size_t j = 0; j < t_values.size(); j++) {
-      re_gridpoint_to_interpolate[j] =
-          get(effective_source_evolution[j])[i].real();
-      im_gridpoint_to_interpolate[j] =
-          get(effective_source_evolution[j])[i].imag();
-    }
-    intrp::CubicSpline re_interpolated_gridpoint{t_values,
-                                                 re_gridpoint_to_interpolate};
-    intrp::CubicSpline im_interpolated_gridpoint{t_values,
-                                                 im_gridpoint_to_interpolate};
-
-    const integration::GslQuadAdaptive<
-        integration::GslIntegralType::StandardGaussKronrod>
-        integration{30};
-
-    double re_integral = integration(
-        [this, &re_interpolated_gridpoint,
-         &im_interpolated_gridpoint](double t) {
-          std::complex<double> phase_factor = std::exp(std::complex<double>(
-              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t));
-          return (1 / t_values[t_values.size() - 1]) *
-                 (re_interpolated_gridpoint(t) * phase_factor.real() -
-                  im_interpolated_gridpoint(t) * phase_factor.imag());
-        },
-        0, t_values[t_values.size() - 1], 1e-9, 6);
-
-    double im_integral = integration(
-        [this, &re_interpolated_gridpoint,
-         &im_interpolated_gridpoint](double t) {
-          std::complex<double> phase_factor = std::exp(std::complex<double>(
-              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t));
-          return (1 / t_values[t_values.size() - 1]) *
-                 (im_interpolated_gridpoint(t) * phase_factor.real() +
-                  re_interpolated_gridpoint(t) * phase_factor.imag());
-        },
-        0, t_values[t_values.size() - 1], 1e-9, 6);
-
-    get(n_mode)[i] = std::complex<double>(re_integral, im_integral);
   }
 
   // Rotate the source by delta_phi and multiply by r / 2 pi
