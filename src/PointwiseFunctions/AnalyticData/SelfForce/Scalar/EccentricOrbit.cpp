@@ -77,7 +77,6 @@ EccentricOrbit::EccentricOrbit(const double black_hole_mass,
       impose_equatorial_symmetry_(impose_equatorial_symmetry),
       time_points_(time_points) {
         compute_trajectory(time_points_);
-        evolve_sources(evolution_tags{});
         }
 
 EccentricOrbit::EccentricOrbit(CkMigrateMessage* m)
@@ -306,16 +305,13 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
 }
 
 // Compute time series data of effective source, puncture and its derivatives
-tuples::TaggedTuple<
-  Tags::EffectiveSourceEvolution,
-  Tags::SingularFieldEvolution,
-  Tags::DerivSingularFieldEvolution
-  > EccentricOrbit::evolve_sources(
+
+void EccentricOrbit::evolve_sources(
       const tnsr::I<DataVector, 2>& x,
       tmpl::list<
         Tags::EffectiveSourceEvolution,
         Tags::SingularFieldEvolution,
-        Tags::DerivSingularFieldEvolution>/*meta*/) const
+        Tags::DerivSingularFieldEvolution>/*meta*/)
 {
   tuples::TaggedTuple<
     Tags::EffectiveSourceEvolution,
@@ -424,7 +420,7 @@ tuples::TaggedTuple<
       get(effective_source_evolution[i]) = get(snapshot_effective_source);
     }
   }
-  return result;
+  //return result;
 }
 
 // Background
@@ -519,11 +515,7 @@ tuples::TaggedTuple<
     tmpl::list<
       ::Tags::FixedSource<Tags::NMode>, Tags::SingularField,
       ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
-      Tags::BoyerLindquistRadius>,
-      std::vector<Scalar<ComplexDataVector>>& effective_source_evolution,
-      std::vector<Scalar<ComplexDataVector>>& singular_field_evolution,
-      std::vector<tnsr::i<ComplexDataVector,2>>& deriv_singular_field_evolution
-        /*meta*/) const {
+      Tags::BoyerLindquistRadius> /*meta*/) const {
 
   const double a = black_hole_spin_ * black_hole_mass_;
   const double M = black_hole_mass_;
@@ -592,6 +584,78 @@ tuples::TaggedTuple<
           result);
   get<0>(deriv_singular_field).destructive_resize(num_points);
   get<1>(deriv_singular_field).destructive_resize(num_points);
+
+  // Compute time evolution of fixed sources
+  // Define fixed sources at a given instance of time ("snapshots")
+  Scalar<ComplexDataVector> snapshot_effective_source;
+  get(snapshot_effective_source).destructive_resize(num_points);
+  Scalar<ComplexDataVector> snapshot_singular_field;
+  get(snapshot_singular_field).destructive_resize(num_points);
+  tnsr::i<ComplexDataVector, 2> snapshot_deriv_singular_field;
+  get<0>(snapshot_deriv_singular_field).destructive_resize(num_points);
+  get<1>(snapshot_deriv_singular_field).destructive_resize(num_points);
+
+  // Define the evolution of these fields
+  singular_field_evolution.resize(time_points());
+  deriv_singular_field_evolution.resize(time_points());
+  effective_source_evolution.resize(time_points());
+
+  //Resize the inner array in the time evolutions
+  for (auto& inner_array : singular_field_evolution) {
+    get(inner_array).destructive_resize(num_points);
+  }
+  for (auto& inner_array : deriv_singular_field_evolution) {
+    get<0>(inner_array).destructive_resize(num_points);
+    get<1>(inner_array).destructive_resize(num_points);
+  }
+  for (auto& inner_array : effective_source_evolution) {
+    get(inner_array).destructive_resize(num_points);
+  }
+
+  {
+    // Call into effsource
+    coordinate x_i{};
+    std::array<double, 2> PhiS{};
+    std::array<double, 8> dPhiS_dx{};
+    std::array<double, 20> d2PhiS_dx2{};
+    std::array<double, 2> src{};
+    effsource_init(M, a);
+
+    for (size_t i = 0; i < t_values.size(); i++)
+    {
+      // Initialize effsource
+      coordinate xp{};
+      xp.t = t_values[i];
+      xp.r = r_of_t[i];
+      xp.theta = M_PI_2;
+      xp.phi = phi_of_t[i];
+      x_i.t = t_values[i];
+      effsource_set_particle(&xp, energy, angular_momentum, u_r[i]);
+
+      for (size_t j = 0; j < num_points; j++)
+      {
+        x_i.r = r[j];
+        x_i.theta = acos(cos_theta[j]);
+        x_i.phi = 0;
+        effsource_calc_m(m_mode_number_, &x_i, PhiS.data(), dPhiS_dx.data(),
+                         d2PhiS_dx2.data(), src.data());
+        get(snapshot_effective_source)[j] =
+            src[0] + std::complex<double>(0., 1.) * src[1];
+        get(snapshot_singular_field)[j] =
+            PhiS[0] + std::complex<double>(0., 1.) * PhiS[1];
+        get<0>(snapshot_deriv_singular_field)[j] =
+            dPhiS_dx[2] + std::complex<double>(0., 1.) * dPhiS_dx[3];
+        get<1>(snapshot_deriv_singular_field)[j] =
+            dPhiS_dx[4] + std::complex<double>(0., 1.) * dPhiS_dx[5];
+      }
+      get(singular_field_evolution[i]) = get(snapshot_singular_field);
+      get<0>(deriv_singular_field_evolution[i]) =
+        get<0>(snapshot_deriv_singular_field);
+      get<1>(deriv_singular_field_evolution[i]) =
+        get<1>(snapshot_deriv_singular_field);
+      get(effective_source_evolution[i]) = get(snapshot_effective_source);
+    }
+  }
 
   // Compute the n_modes of singular field, its derivatives and effective source
   get(singular_field) =

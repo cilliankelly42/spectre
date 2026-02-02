@@ -70,6 +70,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   auto eccentric_orbit = EccentricOrbit{
     1., 0.9, 10., 0.6, m_mode_number, n_mode_number, {{-25., -5., 20., 40.}},
     false, num_time_points};
+  /*
   auto evolved_sources =
       eccentric_orbit.evolve_sources(x, EccentricOrbit::evolution_tags{});
   std::vector<Scalar<ComplexDataVector>>& singular_field_evolution =
@@ -78,6 +79,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
     get<Tags::DerivSingularFieldEvolution>(evolved_sources);
   std::vector<Scalar<ComplexDataVector>>& effective_source_evolution =
     get<Tags::EffectiveSourceEvolution>(evolved_sources);
+  */
 
   double M = eccentric_orbit.black_hole_mass();
   double spin = eccentric_orbit.black_hole_spin();
@@ -128,9 +130,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
       {{-25., -5., 20., 40.}}, false, num_time_points};
     auto vars =
       eccentric_orbit.variables(
-        x, EccentricOrbit::source_tags{},
-        effective_source_evolution, singular_field_evolution,
-        deriv_singular_field_evolution);
+        x, EccentricOrbit::source_tags{});
     auto n_mode_effective_source =
       get<::Tags::FixedSource<Tags::NMode>>(vars);
     auto n_mode_singular_field =

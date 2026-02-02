@@ -134,12 +134,10 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
   using background_tags =
       typename ScalarSelfForce::FirstOrderSystem::background_fields;
   using source_tags = tmpl::list<
-      ::Tags::FixedSource<Tags::MMode>,
+      ::Tags::FixedSource<Tags::NMode>,
       Tags::SingularField,
       ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
-      Tags::BoyerLindquistRadius,
-      Tags::NMode
-      >;
+      Tags::BoyerLindquistRadius>;
 
   // Evolve the m-mode puncture, derivatives and effective source
   void evolve_sources(
@@ -150,8 +148,8 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
       const tnsr::I<DataVector, 2>& x, background_tags /*meta*/) const;
 
   // Initial guess
-  static tuples::TaggedTuple<Tags::MMode> variables(
-      const tnsr::I<DataVector, 2>& x, tmpl::list<Tags::MMode> /*meta*/);
+  static tuples::TaggedTuple<Tags::NMode> variables(
+      const tnsr::I<DataVector, 2>& x, tmpl::list<Tags::NMode> /*meta*/);
 
   // Fixed sources
   tuples::tagged_tuple_from_typelist<source_tags> variables(
@@ -189,9 +187,6 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
   std::vector<double> phi_of_t;
   std::vector<double> t_values;
   std::vector<double> u_r;
-  std::vector<Scalar<ComplexDataVector>> singular_field_evolution;
-  std::vector<Scalar<ComplexDataVector>> effective_source_evolution;
-  std::vector<tnsr::i<ComplexDataVector, 2>> deriv_singular_field_evolution;
 
  private:
   friend bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs);
