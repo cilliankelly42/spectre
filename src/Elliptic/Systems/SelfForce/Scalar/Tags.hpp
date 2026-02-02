@@ -50,12 +50,8 @@ struct SingularFieldEvolution: db::SimpleTag {
   using type = std::vector<Scalar<ComplexDataVector>>;
 };
 
-struct RDerivSingularFieldEvolution: db::SimpleTag {
-  using type = std::vector<Scalar<ComplexDataVector>>;
-};
-
-struct ThetaDerivSingularFieldEvolution: db::SimpleTag {
-  using type = std::vector<Scalar<ComplexDataVector>>;
+struct DerivSingularFieldEvolution : db::SimpleTag {
+  using type = std::vector<tnsr::i<ComplexDataVector,2>>;
 };
 
 struct EffectiveSourceEvolution : db::SimpleTag {

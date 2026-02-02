@@ -10,13 +10,13 @@ set(LIBRARY_SOURCES
 
 add_test_library(${LIBRARY} "${LIBRARY_SOURCES}")
 
-#target_compile_options(
-#  ${LIBRARY}
-#  PRIVATE
-#  -g
-#  -O0
-#  -fno-inline
-#)
+target_compile_options(
+  ${LIBRARY}
+  PRIVATE
+  -g
+  -O0
+  -fno-inline
+)
 
 target_link_libraries(
   ${LIBRARY}
