@@ -153,7 +153,7 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
 
   // Fixed sources
   tuples::tagged_tuple_from_typelist<source_tags> variables(
-      const tnsr::I<DataVector, 2>& x, source_tags /*meta*/) const;
+      const tnsr::I<DataVector, 2>& x, source_tags /*meta*/);
 
   template <typename... RequestedTags>
   tuples::TaggedTuple<RequestedTags...> variables(
@@ -187,6 +187,10 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
   std::vector<double> phi_of_t;
   std::vector<double> t_values;
   std::vector<double> u_r;
+  mutable std::vector<Scalar<ComplexDataVector>> singular_field_evolution;
+  mutable std::vector<tnsr::i<ComplexDataVector, 2>>
+    deriv_singular_field_evolution;
+  mutable std::vector<Scalar<ComplexDataVector>> effective_source_evolution;
 
  private:
   friend bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs);

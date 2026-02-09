@@ -12,6 +12,7 @@
 #include <catch2/catch_message.hpp>
 #include <complex>
 #include <cstddef>
+#include <iostream>
 
 #include "DataStructures/Blaze/IntegerPow.hpp"
 #include "DataStructures/DataVector.hpp"
@@ -62,27 +63,18 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   CAPTURE(min(cos_theta_or_sq));
   CAPTURE(max(cos_theta_or_sq));
 
-  size_t num_time_points = 300;
-  size_t grid_point = 10;
-  size_t time_point = 5;
+  size_t num_time_points = 500;
+  size_t grid_point = 5;
+  size_t time_point = 10;
   int m_mode_number = 1;
   int n_mode_number = 2;
   auto eccentric_orbit = EccentricOrbit{
     1., 0.9, 10., 0.6, m_mode_number, n_mode_number, {{-25., -5., 20., 40.}},
     false, num_time_points};
-  /*
-  auto evolved_sources =
-      eccentric_orbit.evolve_sources(x, EccentricOrbit::evolution_tags{});
-  std::vector<Scalar<ComplexDataVector>>& singular_field_evolution =
-    get<Tags::SingularFieldEvolution>(evolved_sources);
-  std::vector<tnsr::i<ComplexDataVector,2>>& deriv_singular_field_evolution =
-    get<Tags::DerivSingularFieldEvolution>(evolved_sources);
-  std::vector<Scalar<ComplexDataVector>>& effective_source_evolution =
-    get<Tags::EffectiveSourceEvolution>(evolved_sources);
-  */
 
   double M = eccentric_orbit.black_hole_mass();
   double spin = eccentric_orbit.black_hole_spin();
+  double a = spin * M;
   const DataVector r_minus_r_plus =
     gr::boyer_lindquist_radius_minus_r_plus_from_tortoise(
         r_star,
@@ -93,7 +85,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   const DataVector r = r_minus_r_plus + r_plus;
   const DataVector delta = r_minus_r_plus * (r - r_minus);
   const DataVector delta_phi =
-    m_mode_number * spin / (r_plus - r_minus) *
+    m_mode_number * a / (r_plus - r_minus) *
       log((r - r_plus) / (r - r_minus));
   const ComplexDataVector rotation =
       cos(delta_phi) + std::complex<double>(0., 1.) * sin(delta_phi);
@@ -108,14 +100,14 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
     cos_theta.set_data_ref(const_cast<DataVector*>(&cos_theta_or_sq));
     cos_theta_sq = square(cos_theta_or_sq);
   }
-  const DataVector r_sq_plus_a_sq = square(r) + square(spin);
+  const DataVector r_sq_plus_a_sq = square(r) + square(a);
   const DataVector r_sq_plus_a_sq_sq = square(r_sq_plus_a_sq);
   const DataVector sin_theta_sq = 1. - cos_theta_sq;
   const DataVector sin_theta = sqrt(sin_theta_sq);
   const DataVector sin_theta_pow_m = integer_pow(sin_theta, m_mode_number);
 
   // Sum nmodes to n_max at time given by index time
-  int n_max = 30;
+  int n_max = 60;
   Scalar<ComplexDataVector> n_mode_sum_eff_source;
   Scalar<ComplexDataVector> n_mode_sum_singular_field;
   tnsr::i<ComplexDataVector,2> n_mode_sum_deriv_singular_field;
@@ -125,6 +117,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   get<1>(n_mode_sum_deriv_singular_field).destructive_resize(get<0>(x).size());
   for(int n = -n_max; n <= n_max; n++)
   {
+    std::cout << n << "\n";
     eccentric_orbit = EccentricOrbit{
       1., 0.9, 10., 0.6, m_mode_number, n,
       {{-25., -5., 20., 40.}}, false, num_time_points};
@@ -156,93 +149,38 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
       get<1>(n_mode_deriv_singular_field) * phase_factor;
   }
 
-  get(n_mode_sum_eff_source) *= (2*M_PI/r)*rotation *
-    1/(delta * (square(r) + square(spin) * cos_theta_sq) /
-                         r_sq_plus_a_sq_sq / sin_theta_pow_m);
-
-  get(n_mode_sum_singular_field) *=
-    rotation * 1 / (0.5 * r / M_PI / sin_theta_pow_m);
-
-  get<0>(n_mode_sum_deriv_singular_field) *= rotation *
-    1/(0.5 * r / M_PI / sin_theta_pow_m);
-  get<0>(n_mode_sum_deriv_singular_field) -=
-      get(singular_field_evolution[time_point]) / r +
-      std::complex<double>(0., spin * m_mode_number) /
-      delta * get(singular_field_evolution[time_point]);
-  get<0>(n_mode_sum_deriv_singular_field) *= 1/(delta / r_sq_plus_a_sq);
-
-  /*
-  get<1>(deriv_singular_field) *= rotation * 0.5 * r / M_PI / sin_theta_pow_m;
-  // This division is ok because the singular field is only evaluated at the
-  // worldtube boundary where sin(theta) != 0. Also, only the normal to the
-  // boundary is needed, so the angular derivative is discarded on the boundary
-  // that extends to cos_theta = 0. On Gauss-Lobatto grid we may have to work
-  // around this.
-
-  get<1>(deriv_singular_field) /= -sin_theta;
-  if (impose_equatorial_symmetry_) {
-    get<1>(deriv_singular_field) /= 2. * cos_theta;
-  }
-  {
-    ComplexDataVector add_term =
-        m_mode_number_ * get(singular_field) / sin_theta_sq;
-    if (impose_equatorial_symmetry_) {
-      add_term *= 0.5;
-    } else {
-      add_term *= cos_theta;
-    }
-    get<1>(deriv_singular_field) += add_term;
-  }
-*/
-  get<1>(n_mode_sum_deriv_singular_field) *= rotation *
-    1/(0.5 * r / M_PI / sin_theta_pow_m);
-  // This division is ok because the singular field is only evaluated at the
-  // worldtube boundary where sin(theta) != 0. Also, only the normal to the
-  // boundary is needed, so the angular derivative is discarded on the boundary
-  // that extends to cos_theta = 0. On Gauss-Lobatto grid we may have to work
-  // around this.
-
-  get<1>(n_mode_sum_deriv_singular_field) *= -sin_theta;
-  if (eccentric_orbit.impose_equatorial_symmetry()) {
-    get<1>(n_mode_sum_deriv_singular_field) *= 2. * cos_theta;
-  }
-  {
-    ComplexDataVector add_term =
-        m_mode_number * get(singular_field_evolution[time_point])
-        / sin_theta_sq;
-    if (eccentric_orbit.impose_equatorial_symmetry()) {
-      add_term *= 0.5;
-    } else {
-      add_term *= cos_theta;
-    }
-    get<1>(n_mode_sum_deriv_singular_field) -= add_term;
-  }
-
   CAPTURE(get(n_mode_sum_eff_source)[grid_point]);
-  CAPTURE(get(effective_source_evolution[time_point])[grid_point]);
+  CAPTURE(get(
+    eccentric_orbit.effective_source_evolution[time_point])[grid_point]);
   CAPTURE(get(n_mode_sum_singular_field)[grid_point]);
-  CAPTURE(get(singular_field_evolution[time_point])[grid_point]);
+  CAPTURE(get(
+    eccentric_orbit.singular_field_evolution[time_point])[grid_point]);
   CAPTURE(get<0>(n_mode_sum_deriv_singular_field)[grid_point]);
-  CAPTURE(get<0>(deriv_singular_field_evolution[time_point])[grid_point]);
+  CAPTURE(get<0>(
+    eccentric_orbit.deriv_singular_field_evolution[time_point])[grid_point]);
   CAPTURE(get<1>(n_mode_sum_deriv_singular_field)[grid_point]);
-  CAPTURE(get<1>(deriv_singular_field_evolution[time_point])[grid_point]);
+  CAPTURE(
+    get<1>(
+      eccentric_orbit.deriv_singular_field_evolution[time_point])[grid_point]);
 
-  const Approx custom_approx = Approx::custom().epsilon(1.e-5).scale(1.);
+  const Approx custom_approx = Approx::custom().epsilon(1.e-6).scale(1.);
   CHECK_ITERABLE_CUSTOM_APPROX(
       get(n_mode_sum_eff_source)[grid_point],
-      get(effective_source_evolution[time_point])[grid_point],
+      get(eccentric_orbit.effective_source_evolution[time_point])[grid_point],
       custom_approx);
   CHECK_ITERABLE_CUSTOM_APPROX(
       get(n_mode_sum_singular_field)[grid_point],
-      get(singular_field_evolution[time_point])[grid_point],
+      get(eccentric_orbit.singular_field_evolution[time_point])[grid_point],
       custom_approx);
   CHECK_ITERABLE_CUSTOM_APPROX(
-      get<0>(n_mode_sum_deriv_singular_field)[grid_point],
-      get<0>(deriv_singular_field_evolution[time_point])[grid_point],
-      custom_approx);
+    get<0>(n_mode_sum_deriv_singular_field)[grid_point],
+    get<0>(
+      eccentric_orbit.deriv_singular_field_evolution[time_point])[grid_point],
+    custom_approx);
   CHECK_ITERABLE_CUSTOM_APPROX(
-      get<1>(n_mode_sum_deriv_singular_field)[grid_point],
-      get<1>(deriv_singular_field_evolution[time_point])[grid_point],
-      custom_approx);
+    get<1>(n_mode_sum_deriv_singular_field)[grid_point],
+    get<1>(
+      eccentric_orbit.deriv_singular_field_evolution[time_point])[grid_point],
+    custom_approx);
 }
 }  // Namespace ScalarSelfForce::AnalyticData
