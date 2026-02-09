@@ -78,17 +78,18 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
         "domain should span [0, 1] instead of [-1, 1].";
     using type = bool;
   };
-  struct time_points {
+  struct TimePoints {
     static constexpr Options::String help =
       "Specify the number of time points at which to calculate the coordinates "
       "of the particle. This also amounts to choosing the number of time "
       "points to use in the time series data for the m mode effective source "
       "which is used to calculate the n-modes of the fixed sources";
+    using type = size_t;
   };
   using options =
       tmpl::list<BlackHoleMass, BlackHoleSpin, SemiLatusRectum, Eccentricity,
         MModeNumber, NModeNumber, HyperboloidalSlicingTransitions,
-        ImposeEquatorialSymmetry>;
+        ImposeEquatorialSymmetry, TimePoints>;
   static constexpr Options::String help =
       "Quasicircular orbit of a scalar point charge in Kerr spacetime";
 
@@ -134,7 +135,7 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
   using background_tags =
       typename ScalarSelfForce::FirstOrderSystem::background_fields;
   using source_tags = tmpl::list<
-      ::Tags::FixedSource<Tags::NMode>,
+      ::Tags::FixedSource<Tags::MMode>,
       Tags::SingularField,
       ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
       Tags::BoyerLindquistRadius>;
@@ -148,12 +149,12 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
       const tnsr::I<DataVector, 2>& x, background_tags /*meta*/) const;
 
   // Initial guess
-  static tuples::TaggedTuple<Tags::NMode> variables(
-      const tnsr::I<DataVector, 2>& x, tmpl::list<Tags::NMode> /*meta*/);
+  static tuples::TaggedTuple<Tags::MMode> variables(
+      const tnsr::I<DataVector, 2>& x, tmpl::list<Tags::MMode> /*meta*/);
 
   // Fixed sources
   tuples::tagged_tuple_from_typelist<source_tags> variables(
-      const tnsr::I<DataVector, 2>& x, source_tags /*meta*/);
+      const tnsr::I<DataVector, 2>& x, source_tags /*meta*/) const;
 
   template <typename... RequestedTags>
   tuples::TaggedTuple<RequestedTags...> variables(
@@ -187,10 +188,6 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
   std::vector<double> phi_of_t;
   std::vector<double> t_values;
   std::vector<double> u_r;
-  mutable std::vector<Scalar<ComplexDataVector>> singular_field_evolution;
-  mutable std::vector<tnsr::i<ComplexDataVector, 2>>
-    deriv_singular_field_evolution;
-  mutable std::vector<Scalar<ComplexDataVector>> effective_source_evolution;
 
  private:
   friend bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs);
@@ -207,4 +204,4 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
 
 bool operator!=(const EccentricOrbit& lhs, const EccentricOrbit& rhs);
 
-}  // namespace ScalarSelfForce::AnalyticData
+}  // namespace ScalarSelfForce::AnalyticData'numToStr/Comment.nvim',

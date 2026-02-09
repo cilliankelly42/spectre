@@ -79,7 +79,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
     const auto& deriv_singular_field = get<
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(
         vars);
-    const auto& effective_source = get<::Tags::FixedSource<Tags::NMode>>(vars);
+    const auto& effective_source = get<::Tags::FixedSource<Tags::MMode>>(vars);
 
     double mass = eccentric_orbit.black_hole_mass();
 
@@ -110,7 +110,6 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
     // acting on the singular part.
     CHECK_ITERABLE_CUSTOM_APPROX(get(scalar_eqn), -get(effective_source),
                                  custom_approx);
-    std::cout << get(effective_source)[0] << "\n";
   }
 }
 }// namespace ScalarSelfForce::AnalyticData
