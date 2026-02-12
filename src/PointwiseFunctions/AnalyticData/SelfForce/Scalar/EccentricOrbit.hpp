@@ -200,7 +200,7 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
   std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions_{};
   bool impose_equatorial_symmetry_{false};
   size_t time_points_{};
-};
+  };
 
 bool operator!=(const EccentricOrbit& lhs, const EccentricOrbit& rhs);
 

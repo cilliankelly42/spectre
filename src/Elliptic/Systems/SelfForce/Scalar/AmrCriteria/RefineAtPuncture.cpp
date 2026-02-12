@@ -12,6 +12,7 @@
 #include "Domain/Domain.hpp"
 #include "Domain/ElementLogicalCoordinates.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/CircularOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/Background.hpp"
 #include "Utilities/MakeArray.hpp"
 
@@ -20,8 +21,12 @@ namespace ScalarSelfForce::AmrCriteria {
 std::array<amr::Flag, 2> RefineAtPuncture::impl(
     const elliptic::analytic_data::Background& background,
     const Domain<2>& domain, const ElementId<2>& element_id) {
-  const auto puncture_position =
+  /* const auto puncture_position =
       dynamic_cast<const ScalarSelfForce::AnalyticData::CircularOrbit&>(
+          background)
+          .puncture_position(); */
+  const auto puncture_position =
+      dynamic_cast<const ScalarSelfForce::AnalyticData::EccentricOrbit&>(
           background)
           .puncture_position();
   // Split (h-refine) the element if it contains the puncture

@@ -6,6 +6,7 @@
 #include <blaze/math/Vector.h>
 #include <complex.h>
 #include <fftw3.h>
+#include <fstream>
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_odeiv2.h>
@@ -20,6 +21,7 @@ extern "C" {
 }
 
 #include <iostream>
+#include <fstream>
 #include <cmath>
 #include <complex>
 #include <cstddef>
@@ -37,9 +39,11 @@ extern "C" {
 #include "NumericalAlgorithms/Integration/GslQuadAdaptive.hpp"
 #include "NumericalAlgorithms/Interpolation/CubicSpline.hpp"
 #include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
+#include "Utilities/ErrorHandling/GslErrorHandler.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/Math.hpp"
 #include "Utilities/Serialization/PupStlCpp17.hpp"
+#include "Utilities/System/ParallelInfo.hpp"
 
 namespace ScalarSelfForce::AnalyticData {
 
@@ -97,6 +101,7 @@ tnsr::I<double, 2> EccentricOrbit::puncture_position() const {
 ComplexDataVector EccentricOrbit::compute_n_mode(
     std::vector<Scalar<ComplexDataVector>>& time_series_data, size_t num_points,
     double integral_tolerance) const {
+  //gsl_throw_exceptions();
   ComplexDataVector result;
   result.destructive_resize(num_points);
 
@@ -115,7 +120,7 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
 
     const integration::GslQuadAdaptive<
         integration::GslIntegralType::StandardGaussKronrod>
-        integration{30};
+        integration{5000};
 
     double re_integral = integration(
         [this, &re_interpolated_gridpoint,
@@ -126,7 +131,7 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
                  (re_interpolated_gridpoint(t) * phase_factor.real() -
                   im_interpolated_gridpoint(t) * phase_factor.imag());
         },
-        0, t_values[t_values.size() - 1], integral_tolerance, 4);
+        0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
     double im_integral = integration(
         [this, &re_interpolated_gridpoint,
@@ -137,7 +142,7 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
                  (im_interpolated_gridpoint(t) * phase_factor.real() +
                   re_interpolated_gridpoint(t) * phase_factor.imag());
         },
-        0, t_values[t_values.size() - 1], integral_tolerance, 4);
+        0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
     result[i] = std::complex<double>(re_integral, im_integral);
   }
@@ -174,8 +179,9 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
 
     const integration::GslQuadAdaptive<
         integration::GslIntegralType::StandardGaussKronrod>
-        integration{30};
-
+        integration{10000};
+    std::cerr << "PE "<< sys::my_proc()
+      << "Just before integrals, rstar values are: " << get<0>(x) << "\n\n";
     double re_integral_0 = integration(
         [this, &re_interpolated_gridpoint_0,
          &im_interpolated_gridpoint_0](double t) {
@@ -185,7 +191,7 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
                  (re_interpolated_gridpoint_0(t) * phase_factor.real() -
                   im_interpolated_gridpoint_0(t) * phase_factor.imag());
         },
-        0, t_values[t_values.size() - 1], integral_tolerance, 4);
+        0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
     double im_integral_0 = integration(
         [this, &re_interpolated_gridpoint_0,
@@ -196,7 +202,7 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
                  (im_interpolated_gridpoint_0(t) * phase_factor.real() +
                   re_interpolated_gridpoint_0(t) * phase_factor.imag());
         },
-        0, t_values[t_values.size() - 1], integral_tolerance, 4);
+        0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
     double re_integral_1 = integration(
         [this, &re_interpolated_gridpoint_1,
@@ -207,7 +213,7 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
                  (re_interpolated_gridpoint_1(t) * phase_factor.real() -
                   im_interpolated_gridpoint_1(t) * phase_factor.imag());
         },
-        0, t_values[t_values.size() - 1], integral_tolerance, 4);
+        0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
     double im_integral_1 = integration(
         [this, &re_interpolated_gridpoint_1,
@@ -218,7 +224,7 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
                  (im_interpolated_gridpoint_1(t) * phase_factor.real() +
                   re_interpolated_gridpoint_1(t) * phase_factor.imag());
         },
-        0, t_values[t_values.size() - 1], integral_tolerance, 4);
+        0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
     get<0>(result)[i] = std::complex<double>(re_integral_0, im_integral_0);
     get<1>(result)[i] = std::complex<double>(re_integral_1, im_integral_1);
@@ -265,6 +271,8 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
     current_lambda += delta_lambda;
   }
 
+  /* std::cerr << "PE" << sys::my_proc() << "t_of_lambda" <<
+    t_of_lambda << "\n\n"; */
   intrp::CubicSpline lambda_of_t{t_of_lambda, lambda_values};
 
   std::vector<double> chi_of_t(time_points + 1);
@@ -272,7 +280,7 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
   size_t j = 0;
   for (j = 0; j < time_points; j++) {
     if (j == time_points - 1) {
-      current_t -= 1e-10;
+      current_t -= 1e-6;
     }
     r_of_t[j] =
         korb_rfrompsi(korb_psifromla(lambda_of_t(current_t), orbpar), orbpar);
@@ -518,15 +526,14 @@ EccentricOrbit::variables(
             dPhiS_dx[2] + std::complex<double>(0., 1.) * dPhiS_dx[3];
         get<1>(snapshot_deriv_singular_field)[j] =
             dPhiS_dx[4] + std::complex<double>(0., 1.) * dPhiS_dx[5];
+        get(effective_source_evolution[i]) = get(snapshot_effective_source);
       }
       get(singular_field_evolution[i]) = get(snapshot_singular_field);
       get<0>(deriv_singular_field_evolution[i]) =
           get<0>(snapshot_deriv_singular_field);
       get<1>(deriv_singular_field_evolution[i]) =
           get<1>(snapshot_deriv_singular_field);
-      get(effective_source_evolution[i]) = get(snapshot_effective_source);
-
-      get(effective_source_evolution[i]) *= rotation * 0.5 * r / M_PI;
+            get(effective_source_evolution[i]) *= rotation * 0.5 * r / M_PI;
 
       // Factor Delta * (r^2 + a^2 cos^2(theta)) / Sigma^2
       // Factor Sigma^2 / (r^2 + a^2)^2 from first-order formulation
@@ -534,7 +541,6 @@ EccentricOrbit::variables(
 
       get(effective_source_evolution[i]) *= delta * (square(r) + square(a) *
           cos_theta_sq) / r_sq_plus_a_sq_sq / sin_theta_pow_m;
-
       get(singular_field_evolution[i]) *= rotation * 0.5 * r / M_PI
         / sin_theta_pow_m;
 
@@ -578,12 +584,35 @@ EccentricOrbit::variables(
   }
 
   // Compute the n_modes of singular field, derivatives and effective source
+  /* std::cerr << "PE " << sys::my_proc()
+    << " time_points" << time_points_<< "\n\n";
+  std::cerr << "PE" <<  sys::my_proc()
+    << " particle radius" << get<0>(puncture_position()) << "\n\n";
+  std::cerr << "PE" <<  sys::my_proc()
+    << " particle cos(theta)" << get<1>(puncture_position()) << "\n\n";
+  std::cerr << "PE" <<  sys::my_proc()
+    << " r_star grid" << get<0>(x) << "\n\n";
+  std::cerr << "PE" << sys::my_proc()
+    << " cos(theta) grid" << get<1>(x) << "\n\n";
+  std::cerr << "PE" << sys::my_proc()
+    << " r_values" << r_of_t[50] << "\n\n";
+  std::cerr << "PE" << sys::my_proc()
+    << " r_values to star" <<
+    gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
+        r_of_t[50] - r_plus, black_hole_mass_, black_hole_spin_)
+    << "\n\n"; */
+
   get(singular_field) =
       compute_n_mode(singular_field_evolution, num_points, 1e-9);
+  /* std::cerr << "PE" << sys::my_proc()
+    << " singular_field_n_mode" << get(singular_field) << "\n\n"; */
   deriv_singular_field =
       compute_n_mode(deriv_singular_field_evolution, num_points, 1e-9);
   get(effective_source) =
-      compute_n_mode(effective_source_evolution, num_points, 1e-9);
+    compute_n_mode(effective_source_evolution, num_points, 1e-9);
+  /* std::cerr << "PE" << sys::my_proc()
+    << " effective_source_n_mode" << get(effective_source) << "\n\n";
+  std::cerr << "PE" << sys::my_proc() << " Just finised"; */
   return result;
 }
 
@@ -592,12 +621,21 @@ void EccentricOrbit::pup(PUP::er& p) {
   elliptic::analytic_data::InitialGuess::pup(p);
   p | black_hole_mass_;
   p | black_hole_spin_;
-  p | semi_latus_rectum_;  // Fix this and add n_mode and eccentricity
+  p | semi_latus_rectum_;
   p | eccentricity_;
   p | m_mode_number_;
   p | n_mode_number_;
   p | hyperboloidal_slicing_transitions_;
   p | impose_equatorial_symmetry_;
+  p | time_points_;
+  p | t_values;
+  p | r_of_t;
+  p | phi_of_t;
+  p | u_r;
+  p | Omega_phi;
+  p | Omega_r;
+  p | energy;
+  p | angular_momentum;
 }
 
 bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs) {
@@ -609,8 +647,9 @@ bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs) {
          lhs.n_mode_number_ == rhs.n_mode_number_ and
          lhs.hyperboloidal_slicing_transitions_ ==
              rhs.hyperboloidal_slicing_transitions_ and
-         lhs.impose_equatorial_symmetry_ == rhs.impose_equatorial_symmetry_;
-}
+         lhs.impose_equatorial_symmetry_ == rhs.impose_equatorial_symmetry_ and
+         lhs.time_points_ == rhs.time_points_;
+         }
 
 bool operator!=(const EccentricOrbit& lhs, const EccentricOrbit& rhs) {
   return not(lhs == rhs);
