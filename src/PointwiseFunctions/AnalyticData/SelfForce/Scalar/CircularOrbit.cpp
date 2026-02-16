@@ -8,6 +8,7 @@
 #include <effsource.hpp>
 #include <gsl/gsl_errno.h>
 #include <utility>
+#include <iostream>
 
 #include "DataStructures/Blaze/IntegerPow.hpp"
 #include "DataStructures/ComplexDataVector.hpp"
@@ -51,7 +52,10 @@ CircularOrbit::CircularOrbit(const double black_hole_mass,
       orbital_radius_(orbital_radius),
       m_mode_number_(m_mode_number),
       hyperboloidal_slicing_transitions_(hyperboloidal_slicing_transitions),
-      impose_equatorial_symmetry_(impose_equatorial_symmetry) {}
+      impose_equatorial_symmetry_(impose_equatorial_symmetry) {
+        std::cout << "Circular puncture position is:" << puncture_position()
+          << "\n\n";
+      }
 
 CircularOrbit::CircularOrbit(CkMigrateMessage* m)
     : elliptic::analytic_data::Background(m),

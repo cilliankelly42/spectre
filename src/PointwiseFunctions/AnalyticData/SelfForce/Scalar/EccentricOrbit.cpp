@@ -82,6 +82,7 @@ EccentricOrbit::EccentricOrbit(const double black_hole_mass,
       impose_equatorial_symmetry_(impose_equatorial_symmetry),
       time_points_(time_points) {
   compute_trajectory(time_points_);
+  std::cout << "puncture position is" << puncture_position() << "\n\n";
 }
 
 EccentricOrbit::EccentricOrbit(CkMigrateMessage* m)
@@ -180,8 +181,6 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
     const integration::GslQuadAdaptive<
         integration::GslIntegralType::StandardGaussKronrod>
         integration{10000};
-    std::cerr << "PE "<< sys::my_proc()
-      << "Just before integrals, rstar values are: " << get<0>(x) << "\n\n";
     double re_integral_0 = integration(
         [this, &re_interpolated_gridpoint_0,
          &im_interpolated_gridpoint_0](double t) {

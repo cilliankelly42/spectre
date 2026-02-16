@@ -38,6 +38,8 @@
 #include "Parallel/TypeTraits.hpp"
 #include "ParallelAlgorithms/Events/Tags.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/Event.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/CircularOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
 #include "Utilities/ErrorHandling/Assert.hpp"
 #include "Utilities/ErrorHandling/Error.hpp"
 #include "Utilities/Functional.hpp"
@@ -103,11 +105,13 @@ class ObserveSelfForce : public Event {
       return;
     }
     const auto& background = get<BackgroundTag>(box);
-    const auto& circular_orbit =
-        dynamic_cast<const AnalyticData::CircularOrbit&>(background);
+    /* const auto& circular_orbit =
+        dynamic_cast<const AnalyticData::CircularOrbit&>(background); */
+    const auto& eccentric_orbit=
+        dynamic_cast<const AnalyticData::EccentricOrbit&>(background);
     // Get element-logical coords of puncture
     const auto& domain = get<domain::Tags::Domain<2>>(box);
-    const auto puncture_position = circular_orbit.puncture_position();
+    const auto puncture_position = eccentric_orbit.puncture_position();
     const auto& block = domain.blocks()[element_id.block_id()];
     const auto block_logical_coords =
         block_logical_coordinates_single_point(puncture_position, block);
@@ -139,11 +143,12 @@ class ObserveSelfForce : public Event {
     get<1>(deriv_field_at_puncture) = 0.;
     // Calculate self-force in r and theta coordinates
     tnsr::i<std::complex<double>, 2> self_force = deriv_field_at_puncture;
-    const double r0 = circular_orbit.orbital_radius();
-    const double M = circular_orbit.black_hole_mass();
-    const double spin = circular_orbit.black_hole_spin();
+    const double r0 = eccentric_orbit.semi_latus_rectum();
+    // const double r0 = circular_orbit.orbital_radius();
+    const double M = eccentric_orbit.black_hole_mass();
+    const double spin = eccentric_orbit.black_hole_spin();
     const double a = M * spin;
-    const int m_mode = circular_orbit.m_mode_number();
+    const int m_mode = eccentric_orbit.m_mode_number();
     const double r_plus = M * (1. + sqrt(1. - square(spin)));
     const double r_minus = M * (1. - sqrt(1. - square(spin)));
     const double alpha = 1. - 2. * M * r0 / (square(r0) + square(a));

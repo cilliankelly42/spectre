@@ -6,10 +6,11 @@ Description: >
   orbit around a Kerr black hole.
 
   Example:
-    spectre run ScalarSelfForce.yaml -o "test" \
-      -p spin=0.5 -p orbital_radius=10 -p m_mode=2 -p inner_radius=-50 \
-      -p outer_radius=10000 -p puncture_position=15 -p worldtube_radius=15 \
-      -p worldtube_dcostheta=0.5 -p P=4 -p L=2 -p L_theta=1
+    spectre run ScalarSelfForce.yaml -o "ecc_test" \
+      -p spin=0.5 -p semi_latus_rectum=10 -p eccentricity=0 -p m_mode=2 \
+      -p n_mode=0 -p inner_radius=-50 \
+      -p outer_radius=10000 -p puncture_position=12.7759 -p worldtube_radius=5 \
+      -p worldtube_dcostheta=0.5 -p P=4 -p L=2 -p L_theta=1 -p time_points=100
 
   Then, for example, run 'spectre generate-id' on the volume data output to view
   in ParaView or inspect the reduction data output to see the extracted
@@ -24,17 +25,20 @@ ExpectedOutput:
 ---
 
 Background: &background
-  CircularOrbit:
+  EccentricOrbit:
     BlackHoleMass: &bh_mass 1.
     BlackHoleSpin: &bh_spin 0.5
-    OrbitalRadius: &orbital_radius 10
+    SemiLatusRectum: &semi_latus_rectum 10
+    Eccentricity: &eccentricity 0
     MModeNumber: &m_mode_number 2
+    NModeNumber: &n_mode_number 0
     HyperboloidalSlicingTransitions:
-      - -25
-      - 0
-      - 30
-      - 55
+      - -17.2241
+      - 7.7759
+      - 17.7759
+      - 42.7759
     ImposeEquatorialSymmetry: False
+    TimePoints: &time_points 100
 
 InitialGuess: *background
 
@@ -46,10 +50,10 @@ DomainCreator:
     BlockBounds:
       # rstar
       - - -50
-        - -25
-        - 0
-        - 30
-        - 55
+        - -17.2241
+        - 7.7759
+        - 17.7759
+        - 42.7759
         - 10000
       # cos(theta)
       - [-1., -0.5 , 0.5, 1.]
@@ -122,7 +126,7 @@ DomainCreator:
           Sommerfeld:
             BlackHoleMass: *bh_mass
             BlackHoleSpin: *bh_spin
-            OrbitalRadius: *orbital_radius
+            OrbitalRadius: *semi_latus_rectum
             MModeNumber: *m_mode_number
             HyperboloidalSlicing: True
             Order: 1
@@ -130,7 +134,7 @@ DomainCreator:
           Sommerfeld:
             BlackHoleMass: *bh_mass
             BlackHoleSpin: *bh_spin
-            OrbitalRadius: *orbital_radius
+            OrbitalRadius: *semi_latus_rectum
             MModeNumber: *m_mode_number
             HyperboloidalSlicing: True
             Order: 2
@@ -162,7 +166,7 @@ Amr:
       ErrorBeyondLimits: True
     AllowCoarsening: False
   MaxCoarseLevels: Auto
-  Iterations: 10
+  Iterations: 1
 
 PhaseChangeAndTriggers:
   # Run AMR in every iteration, but not on the initial guess

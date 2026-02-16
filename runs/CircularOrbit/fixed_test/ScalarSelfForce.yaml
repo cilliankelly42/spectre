@@ -8,7 +8,7 @@ Description: >
   Example:
     spectre run ScalarSelfForce.yaml -o "test" \
       -p spin=0.5 -p orbital_radius=10 -p m_mode=2 -p inner_radius=-50 \
-      -p outer_radius=10000 -p puncture_position=15 -p worldtube_radius=15 \
+      -p outer_radius=10000 -p puncture_position=12.7759-p worldtube_radius=5\
       -p worldtube_dcostheta=0.5 -p P=4 -p L=2 -p L_theta=1
 
   Then, for example, run 'spectre generate-id' on the volume data output to view
@@ -30,10 +30,10 @@ Background: &background
     OrbitalRadius: &orbital_radius 10
     MModeNumber: &m_mode_number 2
     HyperboloidalSlicingTransitions:
-      - -25
-      - 0
-      - 30
-      - 55
+      - -17.2241
+      - 7.7759
+      - 17.7759
+      - 42.7759
     ImposeEquatorialSymmetry: False
 
 InitialGuess: *background
@@ -46,10 +46,10 @@ DomainCreator:
     BlockBounds:
       # rstar
       - - -50
-        - -25
-        - 0
-        - 30
-        - 55
+        - -17.2241
+        - 7.7759
+        - 17.7759
+        - 42.7759
         - 10000
       # cos(theta)
       - [-1., -0.5 , 0.5, 1.]
