@@ -27,18 +27,18 @@ ExpectedOutput:
 Background: &background
   EccentricOrbit:
     BlackHoleMass: &bh_mass 1.
-    BlackHoleSpin: &bh_spin 0.5
-    SemiLatusRectum: &semi_latus_rectum 10
-    Eccentricity: &eccentricity 0
-    MModeNumber: &m_mode_number 2
-    NModeNumber: &n_mode_number 0
+    BlackHoleSpin: &bh_spin {{ spin }}
+    SemiLatusRectum: &semi_latus_rectum {{ semi_latus_rectum}}
+    Eccentricity: &eccentricity {{ eccentricity }}
+    MModeNumber: &m_mode_number {{ m_mode }}
+    NModeNumber: &n_mode_number {{ n_mode }}
     HyperboloidalSlicingTransitions:
-      - -17.2241
-      - 7.7759
-      - 17.7759
-      - 42.7759
+      - {{ puncture_position - worldtube_radius - 25 }}
+      - {{ puncture_position - worldtube_radius }}
+      - {{ puncture_position + worldtube_radius }}
+      - {{ puncture_position + worldtube_radius + 25 }}
     ImposeEquatorialSymmetry: False
-    TimePoints: &time_points 10
+    TimePoints: &time_points {{ time_points }}
 
 InitialGuess: *background
 
@@ -49,14 +49,14 @@ DomainCreator:
     # Order of dimensions is (r_*, theta)
     BlockBounds:
       # rstar
-      - - -50
-        - -17.2241
-        - 7.7759
-        - 17.7759
-        - 42.7759
-        - 10000
+      - - {{ inner_radius }}
+        - {{ puncture_position - worldtube_radius - 25 }}
+        - {{ puncture_position - worldtube_radius }}
+        - {{ puncture_position + worldtube_radius }}
+        - {{ puncture_position + worldtube_radius + 25 }}
+        - {{ outer_radius }}
       # cos(theta)
-      - [-1., -0.5 , 0.5, 1.]
+      - [-1., {{ -worldtube_dcostheta}} , {{ worldtube_dcostheta }}, 1.]
     Distributions:
       # rstar
       - [Linear, Linear, Linear, Linear, Inverse]
@@ -67,59 +67,59 @@ DomainCreator:
       - [0., 0., 0., 0., 0.]
       # cos(theta)
       - [0., 0., 0.]
-    InitialGridPoints: [4, 4]
-    InitialLevels: [2, 1]
+    InitialGridPoints: [{{ P }}, {{ P }}]
+    InitialLevels: [{{ L }}, {{ L_theta }}]
     RefinedGridPoints: []
     BlocksToExclude: []
     RefinedLevels:
       # bottom row
       - LowerCornerIndex: [0, 0] # bottom left
         UpperCornerIndex: [1, 1]
-        Refinement: [ 1, 1 ]
+        Refinement: [ {{ L - 1 }}, {{ L_theta }} ]
       - LowerCornerIndex: [1, 0] # bottom transition left
         UpperCornerIndex: [2, 1]
-        Refinement: [ 1, 1 ]
+        Refinement: [ {{ L - 1 }}, {{ L_theta }} ]
       - LowerCornerIndex: [2, 0] # bottom middle
         UpperCornerIndex: [3, 1]
-        Refinement: [ 2, 1 ]
+        Refinement: [ {{ L }}, {{ L_theta }} ]
       - LowerCornerIndex: [3, 0] # bottom transition right
         UpperCornerIndex: [4, 1]
-        Refinement: [ 1, 1 ]
+        Refinement: [ {{ L - 1 }}, {{ L_theta }} ]
       - LowerCornerIndex: [4, 0] # bottom right
         UpperCornerIndex: [5, 1]
-        Refinement: [ 2, 0 ]
+        Refinement: [ {{ L }}, {{ L_theta - 1 }} ]
       # middle row
       - LowerCornerIndex: [0, 1] # middle left
         UpperCornerIndex: [1, 2]
-        Refinement: [ 1, 1 ]
+        Refinement: [ {{ L - 1 }}, {{ L_theta }} ]
       - LowerCornerIndex: [1, 1] # middle transition left
         UpperCornerIndex: [2, 2]
-        Refinement: [ 1, 1 ]
+        Refinement: [ {{ L - 1 }}, {{ L_theta }} ]
       - LowerCornerIndex: [2, 1] # source region
         UpperCornerIndex: [3, 2]
-        Refinement: [ 2, 1 ]
+        Refinement: [ {{ L }}, {{ L_theta }} ]
       - LowerCornerIndex: [3, 1] # middle transition right
         UpperCornerIndex: [4, 2]
-        Refinement: [ 1, 1 ]
+        Refinement: [ {{ L - 1 }}, {{ L_theta }} ]
       - LowerCornerIndex: [4, 1] # middle right
         UpperCornerIndex: [5, 2]
-        Refinement: [ 2, 0 ]
+        Refinement: [ {{ L }}, {{ L_theta - 1 }} ]
       # top row
       - LowerCornerIndex: [0, 2] # top left
         UpperCornerIndex: [1, 3]
-        Refinement: [ 1, 1 ]
+        Refinement: [ {{ L - 1 }}, {{ L_theta }} ]
       - LowerCornerIndex: [1, 2] # top transition left
         UpperCornerIndex: [2, 3]
-        Refinement: [ 1, 1 ]
+        Refinement: [ {{ L - 1 }}, {{ L_theta }} ]
       - LowerCornerIndex: [2, 2] # top middle
         UpperCornerIndex: [3, 3]
-        Refinement: [ 2, 1 ]
+        Refinement: [ {{ L }}, {{ L_theta }} ]
       - LowerCornerIndex: [3, 2] # top transition right
         UpperCornerIndex: [4, 3]
-        Refinement: [ 1, 1 ]
+        Refinement: [ {{ L - 1 }}, {{ L_theta }} ]
       - LowerCornerIndex: [4, 2] # top right
         UpperCornerIndex: [5, 3]
-        Refinement: [ 2, 0 ]
+        Refinement: [ {{ L }}, {{ L_theta - 1 }} ]
     BoundaryConditions: &boundary_conditions
       # Radial boundary conditions
       - Lower:
@@ -128,7 +128,7 @@ DomainCreator:
             BlackHoleSpin: *bh_spin
             OrbitalRadius: *semi_latus_rectum
             MModeNumber: *m_mode_number
-            HyperboloidalSlicing: True
+            HyperboloidalSlicing: False
             Order: 1
         Upper:
           Sommerfeld:
@@ -136,7 +136,7 @@ DomainCreator:
             BlackHoleSpin: *bh_spin
             OrbitalRadius: *semi_latus_rectum
             MModeNumber: *m_mode_number
-            HyperboloidalSlicing: True
+            HyperboloidalSlicing: False
             Order: 2
       # Angular boundary conditions
       - Angular:
@@ -210,7 +210,7 @@ LinearSolver:
     ComplexShift: 0.
 
   SchwarzSmoother:
-    Iterations: 2
+    Iterations: 1
     MaxOverlap: Auto
     Verbosity: Silent
     SubdomainSolver:

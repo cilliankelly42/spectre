@@ -38,7 +38,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricCircular",
   const double delta_costheta = 0.2;
   const double rstar_offset = 0.;
   const double delta_rstar = 5.;
-  const size_t npoints = 2;
+  const size_t npoints = 20;
   const domain::creators::Rectangle domain_creator{
       {{rstar_offset, costheta_offset}},
       {{rstar_offset + delta_rstar, costheta_offset + delta_costheta}},

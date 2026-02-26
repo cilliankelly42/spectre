@@ -6,7 +6,6 @@
 #include <blaze/math/Vector.h>
 #include <complex.h>
 #include <fftw3.h>
-#include <fstream>
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_odeiv2.h>
@@ -20,13 +19,12 @@ extern "C" {
 #include "korb.h"
 }
 
-#include <iostream>
-#include <fstream>
 #include <cmath>
 #include <complex>
 #include <cstddef>
 #include <effsource.hpp>
 #include <gsl/gsl_errno.h>
+#include <mutex>
 #include <utility>
 
 #include "DataStructures/Blaze/IntegerPow.hpp"
@@ -82,7 +80,6 @@ EccentricOrbit::EccentricOrbit(const double black_hole_mass,
       impose_equatorial_symmetry_(impose_equatorial_symmetry),
       time_points_(time_points) {
   compute_trajectory(time_points_);
-  std::cout << "puncture position is" << puncture_position() << "\n\n";
 }
 
 EccentricOrbit::EccentricOrbit(CkMigrateMessage* m)
@@ -123,6 +120,7 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
         integration::GslIntegralType::StandardGaussKronrod>
         integration{5000};
 
+    // Try catch
     double re_integral = integration(
         [this, &re_interpolated_gridpoint,
          &im_interpolated_gridpoint](double t) {
@@ -180,7 +178,7 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
 
     const integration::GslQuadAdaptive<
         integration::GslIntegralType::StandardGaussKronrod>
-        integration{10000};
+        integration{5000};
     double re_integral_0 = integration(
         [this, &re_interpolated_gridpoint_0,
          &im_interpolated_gridpoint_0](double t) {
@@ -270,8 +268,6 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
     current_lambda += delta_lambda;
   }
 
-  /* std::cerr << "PE" << sys::my_proc() << "t_of_lambda" <<
-    t_of_lambda << "\n\n"; */
   intrp::CubicSpline lambda_of_t{t_of_lambda, lambda_values};
 
   std::vector<double> chi_of_t(time_points + 1);
@@ -501,6 +497,7 @@ EccentricOrbit::variables(
     std::array<double, 2> src{};
     effsource_init(M, a);
 
+    std::lock_guard<std::mutex> lock(*effsource_mutex);
     for (size_t i = 0; i < t_values.size(); i++) {
       // Initialize effsource
       coordinate xp{};
@@ -581,37 +578,12 @@ EccentricOrbit::variables(
       }
     }
   }
-
-  // Compute the n_modes of singular field, derivatives and effective source
-  /* std::cerr << "PE " << sys::my_proc()
-    << " time_points" << time_points_<< "\n\n";
-  std::cerr << "PE" <<  sys::my_proc()
-    << " particle radius" << get<0>(puncture_position()) << "\n\n";
-  std::cerr << "PE" <<  sys::my_proc()
-    << " particle cos(theta)" << get<1>(puncture_position()) << "\n\n";
-  std::cerr << "PE" <<  sys::my_proc()
-    << " r_star grid" << get<0>(x) << "\n\n";
-  std::cerr << "PE" << sys::my_proc()
-    << " cos(theta) grid" << get<1>(x) << "\n\n";
-  std::cerr << "PE" << sys::my_proc()
-    << " r_values" << r_of_t[50] << "\n\n";
-  std::cerr << "PE" << sys::my_proc()
-    << " r_values to star" <<
-    gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
-        r_of_t[50] - r_plus, black_hole_mass_, black_hole_spin_)
-    << "\n\n"; */
-
   get(singular_field) =
-      compute_n_mode(singular_field_evolution, num_points, 1e-9);
-  /* std::cerr << "PE" << sys::my_proc()
-    << " singular_field_n_mode" << get(singular_field) << "\n\n"; */
+      compute_n_mode(singular_field_evolution, num_points, 1e-8);
   deriv_singular_field =
-      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-9);
+      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-8);
   get(effective_source) =
-    compute_n_mode(effective_source_evolution, num_points, 1e-9);
-  /* std::cerr << "PE" << sys::my_proc()
-    << " effective_source_n_mode" << get(effective_source) << "\n\n";
-  std::cerr << "PE" << sys::my_proc() << " Just finised"; */
+    compute_n_mode(effective_source_evolution, num_points, 1e-8);
   return result;
 }
 

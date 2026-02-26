@@ -123,6 +123,7 @@ class ObserveSelfForce : public Event {
     if (not puncture_logical_coords.has_value()) {
       return;
     }
+
     // Interpolate field and field derivative to puncture position
     const auto& field = get<Tags::MMode>(box);
     const auto& mesh = get<domain::Tags::Mesh<2>>(box);
@@ -190,7 +191,9 @@ class ObserveSelfForce : public Event {
                         get<1>(deriv_field_at_puncture).imag(),
                         get<0>(self_force).real(), get<0>(self_force).imag(),
                         get<1>(self_force).real(), get<1>(self_force).imag()));
+
   }
+
 
   using observation_registration_tags = tmpl::list<::Tags::DataBox>;
 

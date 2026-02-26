@@ -1,6 +1,7 @@
 // Distributed under the MIT License.
 // See LICENSE.txt for details.
 
+#include "Elliptic/Systems/SelfForce/Scalar/Tags.hpp"
 #include "Framework/TestingFramework.hpp"
 
 #include <array>
@@ -36,7 +37,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   const double costheta_offset = 0.1;
   const double delta_costheta = 0.2;
   const double rstar_offset = 0.;
-  const double delta_rstar = 5.;
+  const double delta_rstar = 2.;
   const size_t npoints = 20;
   const domain::creators::Rectangle domain_creator{
       {{rstar_offset, costheta_offset}},
@@ -61,18 +62,19 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   CAPTURE(max(cos_theta));
 
   // Get the analytic fields
-  for (int n_mode_number = 2; n_mode_number < 5; ++n_mode_number) {
+  for (int n_mode_number = 1; n_mode_number < 4; ++n_mode_number) {
 
     CAPTURE(n_mode_number);
     const auto eccentric_orbit = EccentricOrbit{
-        1., 0.9, 6., 0, 2, n_mode_number,
-        {{-25., -5., 20., 40.}}, false, 1000};
+        1., 0.9, 10., 0.3, 2, n_mode_number,
+        {{-25., -5., 20., 40.}}, false, 500};
     //CAPTURE(eccentric_orbit.puncture_position());
     const auto background =
         eccentric_orbit.variables(x, EccentricOrbit::background_tags{});
     const auto& alpha = get<Tags::Alpha>(background);
     const auto& beta = get<Tags::Beta>(background);
     const auto& gamma = get<Tags::Gamma>(background);
+
     const auto vars = eccentric_orbit.variables(
         x, EccentricOrbit::source_tags{});
     const auto& singular_field = get<Tags::SingularField>(vars);
@@ -101,6 +103,9 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
                                     singular_field, deriv_singular_field,
                                     flux_singular_field);
 
+    CAPTURE(singular_field);
+    CAPTURE(deriv_singular_field);
+    CAPTURE(get(effective_source));
     // Minus sign is from the definition of the effective source:
     //   \psi = \psi_R + \psi_P = 0
     // where \psi_R is the regular part and \psi_P is the singular part

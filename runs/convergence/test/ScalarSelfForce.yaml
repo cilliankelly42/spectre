@@ -29,16 +29,16 @@ Background: &background
     BlackHoleMass: &bh_mass 1.
     BlackHoleSpin: &bh_spin 0.5
     SemiLatusRectum: &semi_latus_rectum 10
-    Eccentricity: &eccentricity 0
+    Eccentricity: &eccentricity 0.3
     MModeNumber: &m_mode_number 2
-    NModeNumber: &n_mode_number 0
+    NModeNumber: &n_mode_number 1
     HyperboloidalSlicingTransitions:
       - -17.2241
       - 7.7759
       - 17.7759
       - 42.7759
     ImposeEquatorialSymmetry: False
-    TimePoints: &time_points 10
+    TimePoints: &time_points 1000
 
 InitialGuess: *background
 
@@ -128,7 +128,7 @@ DomainCreator:
             BlackHoleSpin: *bh_spin
             OrbitalRadius: *semi_latus_rectum
             MModeNumber: *m_mode_number
-            HyperboloidalSlicing: True
+            HyperboloidalSlicing: False
             Order: 1
         Upper:
           Sommerfeld:
@@ -136,7 +136,7 @@ DomainCreator:
             BlackHoleSpin: *bh_spin
             OrbitalRadius: *semi_latus_rectum
             MModeNumber: *m_mode_number
-            HyperboloidalSlicing: True
+            HyperboloidalSlicing: False 
             Order: 2
       # Angular boundary conditions
       - Angular:
@@ -210,7 +210,7 @@ LinearSolver:
     ComplexShift: 0.
 
   SchwarzSmoother:
-    Iterations: 2
+    Iterations: 1
     MaxOverlap: Auto
     Verbosity: Silent
     SubdomainSolver:

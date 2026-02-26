@@ -38,7 +38,7 @@ Background: &background
       - 17.7759
       - 42.7759
     ImposeEquatorialSymmetry: False
-    TimePoints: &time_points 10
+    TimePoints: &time_points 1000
 
 InitialGuess: *background
 
@@ -128,7 +128,7 @@ DomainCreator:
             BlackHoleSpin: *bh_spin
             OrbitalRadius: *semi_latus_rectum
             MModeNumber: *m_mode_number
-            HyperboloidalSlicing: True
+            HyperboloidalSlicing: False
             Order: 1
         Upper:
           Sommerfeld:
@@ -136,7 +136,7 @@ DomainCreator:
             BlackHoleSpin: *bh_spin
             OrbitalRadius: *semi_latus_rectum
             MModeNumber: *m_mode_number
-            HyperboloidalSlicing: True
+            HyperboloidalSlicing: False
             Order: 2
       # Angular boundary conditions
       - Angular:
@@ -210,7 +210,7 @@ LinearSolver:
     ComplexShift: 0.
 
   SchwarzSmoother:
-    Iterations: 2
+    Iterations: 1
     MaxOverlap: Auto
     Verbosity: Silent
     SubdomainSolver:
