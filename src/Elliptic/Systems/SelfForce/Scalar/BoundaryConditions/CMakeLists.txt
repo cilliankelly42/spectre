@@ -12,14 +12,6 @@ spectre_target_sources(
   Sommerfeld.cpp
   )
 
-target_compile_options(
-  ${LIBRARY}
-  PRIVATE
-  -g
-  -O0
-  -fno-inline
-)
-
 spectre_target_headers(
   ${LIBRARY}
   INCLUDE_DIRECTORY ${CMAKE_SOURCE_DIR}/src

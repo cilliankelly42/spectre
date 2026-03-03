@@ -6,9 +6,10 @@ Description: >
   orbit around a Kerr black hole.
 
   Example:
-    spectre run ScalarSelfForce.yaml -o "test" \
-      -p spin=0.5 -p orbital_radius=10 -p m_mode=2 -p inner_radius=-50 \
-      -p outer_radius=10000 -p puncture_position=15 -p worldtube_radius=15 \
+    spectre run ScalarSelfForce.yaml -o "ecc_test" \
+      -p spin=0.5 -p orbital_radius=10 -p m_mode=0 \
+      -p inner_radius=-50 \
+      -p outer_radius=10000 -p puncture_position=12.7759 -p worldtube_radius=5 \
       -p worldtube_dcostheta=0.5 -p P=4 -p L=2 -p L_theta=1
 
   Then, for example, run 'spectre generate-id' on the volume data output to view
@@ -162,7 +163,7 @@ Amr:
       ErrorBeyondLimits: True
     AllowCoarsening: False
   MaxCoarseLevels: Auto
-  Iterations: 10
+  Iterations: 5
 
 PhaseChangeAndTriggers:
   # Run AMR in every iteration, but not on the initial guess

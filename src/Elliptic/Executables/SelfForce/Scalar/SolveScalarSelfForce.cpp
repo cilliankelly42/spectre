@@ -11,7 +11,6 @@
 #include "Parallel/CharmMain.tpp"
 #include "ParallelAlgorithms/Amr/Actions/RegisterCallbacks.hpp"
 #include "Utilities/Serialization/RegisterDerivedClassesWithCharm.hpp"
-#include "Utilities/System/AttachDebugger.hpp"
 
 extern "C" void CkRegisterMainModule() {
   Parallel::charmxx::register_main_module<Metavariables>();
