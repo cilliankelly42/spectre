@@ -189,8 +189,6 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
   std::vector<double> phi_of_t;
   std::vector<double> t_values;
   std::vector<double> u_r;
-  mutable std::unique_ptr<std::mutex> effsource_mutex = 
-    std::make_unique<std::mutex>();
 
  private:
   friend bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs);

@@ -1,7 +1,6 @@
 // Distributed under the MIT License.
 // See LICENSE.txt for details.
 
-#include "Elliptic/Systems/SelfForce/Scalar/Tags.hpp"
 #include "Framework/TestingFramework.hpp"
 
 #include <array>
@@ -19,7 +18,6 @@
 #include "NumericalAlgorithms/LinearOperators/Divergence.tpp"
 #include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
 #include "NumericalAlgorithms/Spectral/LogicalCoordinates.hpp"
-#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/CircularOrbit.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
@@ -35,11 +33,11 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   // the puncture.
 
   // Set up a domain
-  const double costheta_offset = 0.034716;
+  const double costheta_offset = 0.1;
   const double delta_costheta = 0.2;
-  const double rstar_offset = 13.4703;
-  const double delta_rstar = 2.;
-  const size_t npoints = 3;
+  const double rstar_offset = 0.;
+  const double delta_rstar = 5.;
+  const size_t npoints = 2;
   const domain::creators::Rectangle domain_creator{
       {{rstar_offset, costheta_offset}},
       {{rstar_offset + delta_rstar, costheta_offset + delta_costheta}},
@@ -61,15 +59,13 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   CAPTURE(max(r_star));
   CAPTURE(min(cos_theta));
   CAPTURE(max(cos_theta));
-  std::cout << get<0>(x) << "\n";
-  std::cout << get<1>(x) << "\n";
 
   // Get the analytic fields
-  // for (int n_mode_number = 1; n_mode_number < 4; ++n_mode_number) {
+  for (int n_mode_number = 1; n_mode_number < 2; ++n_mode_number) {
 
-    // CAPTURE(n_mode_number);
+    CAPTURE(n_mode_number);
     const auto eccentric_orbit = EccentricOrbit{
-        1., 0.5, 10., 0, 2, 0,
+        1., 0.5, 10., 0, 0, n_mode_number,
         {{-25., -5., 20., 40.}}, false, 500};
     //CAPTURE(eccentric_orbit.puncture_position());
     const auto background =
@@ -77,7 +73,6 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
     const auto& alpha = get<Tags::Alpha>(background);
     const auto& beta = get<Tags::Beta>(background);
     const auto& gamma = get<Tags::Gamma>(background);
-
     const auto vars = eccentric_orbit.variables(
         x, EccentricOrbit::source_tags{});
     const auto& singular_field = get<Tags::SingularField>(vars);
@@ -85,18 +80,23 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(
         vars);
     const auto& effective_source = get<::Tags::FixedSource<Tags::MMode>>(vars);
+    std::cout << "singular_field" << "\n" 
+      << singular_field << "\n";
+      /* << "deriv_singular_field" << "\n"
+      << deriv_singular_field << "\n"
+      <<"effective source: " << "\n"
+      << effective_source  << "\n"; */
 
     double mass = eccentric_orbit.black_hole_mass();
 
     const auto numeric_deriv_singular_field =
         partial_derivative(singular_field, mesh, inv_jacobian);
     const Approx custom_approx = Approx::custom().epsilon(1.e-8).scale(1.);
-    /* for (size_t i = 0; i < deriv_singular_field.size(); ++i) {
-      CAPTURE(deriv_singular_field[i]);
+    for (size_t i = 0; i < deriv_singular_field.size(); ++i) {
       CAPTURE(i);
       CHECK_ITERABLE_CUSTOM_APPROX(numeric_deriv_singular_field[i],
                                    deriv_singular_field[i], custom_approx);
-    } */
+    }
 
     tnsr::I<ComplexDataVector, 2> flux_singular_field{};
     ScalarSelfForce::Fluxes::apply(make_not_null(&flux_singular_field), alpha,
@@ -107,8 +107,6 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
                                     singular_field, deriv_singular_field,
                                     flux_singular_field);
 
-    CAPTURE(singular_field);
-    CAPTURE(get(effective_source));
     // Minus sign is from the definition of the effective source:
     //   \psi = \psi_R + \psi_P = 0
     // where \psi_R is the regular part and \psi_P is the singular part
@@ -116,8 +114,8 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
     // where -Delta represents the elliptic operator. So the effective source
     // for the regular part is is the negative of the elliptic operator
     // acting on the singular part.
-    /* CHECK_ITERABLE_CUSTOM_APPROX(get(scalar_eqn), -get(effective_source),
-                                 custom_approx); */
-  // }
+    CHECK_ITERABLE_CUSTOM_APPROX(get(scalar_eqn), -get(effective_source),
+                                 custom_approx);
+  }
 }
 }// namespace ScalarSelfForce::AnalyticData

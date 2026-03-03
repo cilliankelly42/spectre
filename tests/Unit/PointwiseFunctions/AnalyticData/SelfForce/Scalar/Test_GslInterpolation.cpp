@@ -12,6 +12,7 @@
 #include <sstream>
 
 #include "Framework/TestHelpers.hpp"
+#include "NumericalAlgorithms/Integration/GslQuadAdaptive.hpp"
 #include "NumericalAlgorithms/Interpolation/CubicSpline.hpp"
 #include "Utilities/Math.hpp"
 
@@ -19,7 +20,7 @@ namespace ScalarSelfForce::AnalyticData {
 
 SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.TestSpline",
                   "[PointwiseFunctions][Unit]") {
-    std::vector<double> times(500);
+    /* std::vector<double> times(500);
     std::vector<double> data_to_interpolate(500);
     std::ifstream input_data_to_interpolate(
             "/home/user/spline_testing/data_to_interpolate.txt");
@@ -40,6 +41,17 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.TestSpline",
         interpolated_data << t << "\t" 
             << interpolant(t) << "\n";
     }
-    interpolated_data.close();
+    interpolated_data.close(); */
+    /* const integration::GslQuadAdaptive<
+        integration::GslIntegralType::StandardGaussKronrod>
+        integration{5000};
+
+    double integral = integration(
+            [](double t){ return exp(std::complex<double>(0, t)); },
+            0,
+            2 * M_PI,
+            0, 6, 1e-12
+            );
+    std::cout << integral << "\n"; */
 }
 } // Namespace ScalarSelfForce::AnalyticData

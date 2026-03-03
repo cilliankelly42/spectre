@@ -28,7 +28,6 @@ extern "C" {
 #include <gsl/gsl_errno.h>
 #include <fstream>
 #include <iostream>
-#include <mutex>
 #include <utility>
 
 #include "DataStructures/Blaze/IntegerPow.hpp"
@@ -112,12 +111,18 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
 
   for (size_t i = 0; i < num_points; i++) {
     for (size_t j = 0; j < t_values.size(); j++) {
-      re_gridpoint_to_interpolate[j] = get(time_series_data[j])[i].real();
-      im_gridpoint_to_interpolate[j] = get(time_series_data[j])[i].imag();
+      std::complex<double> phase_factor = std::exp(std::complex<double>(
+              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t_values[j]));
+      re_gridpoint_to_interpolate[j] = 
+        (get(time_series_data[j])[i].real() * phase_factor.real()) -
+        (get(time_series_data[j])[i].imag() * phase_factor.imag());
+      im_gridpoint_to_interpolate[j] = 
+        (get(time_series_data[j])[i].imag() * phase_factor.real()) + 
+        (get(time_series_data[j])[i].real() * phase_factor.imag());
     }
-    intrp::CubicSpline re_interpolated_gridpoint{t_values,
+    intrp::CubicSpline re_interpolated_integrand{t_values,
                                                  re_gridpoint_to_interpolate};
-    intrp::CubicSpline im_interpolated_gridpoint{t_values,
+    intrp::CubicSpline im_interpolated_integrand{t_values,
                                                  im_gridpoint_to_interpolate};
 
     const integration::GslQuadAdaptive<
@@ -126,39 +131,35 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
 
     double re_integral = 0;
     double im_integral = 0;
-    // try{
+
+    try{
     re_integral = integration(
-        [this, &re_interpolated_gridpoint,
-         &im_interpolated_gridpoint](double t) {
-          std::complex<double> phase_factor = std::exp(std::complex<double>(
-              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t));
+        [this, &re_interpolated_integrand](double t) {
           return (1 / t_values[t_values.size() - 1]) *
-                 (re_interpolated_gridpoint(t) * phase_factor.real() -
-                  im_interpolated_gridpoint(t) * phase_factor.imag());
+          re_interpolated_integrand(t);
         },
         0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
     im_integral = integration(
-        [this, &re_interpolated_gridpoint,
-         &im_interpolated_gridpoint](double t) {
-          std::complex<double> phase_factor = std::exp(std::complex<double>(
-              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t));
+        [this, &im_interpolated_integrand](double t) {
           return (1 / t_values[t_values.size() - 1]) *
-                 (im_interpolated_gridpoint(t) * phase_factor.real() +
-                  re_interpolated_gridpoint(t) * phase_factor.imag());
+          im_interpolated_integrand(t);
         },
         0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
-      /* } catch (const std::runtime_error& e) {
-        std::cerr << "Caught GSL exception: " << e.what() << "\n";
-        std::cerr << "Current number of points: " << num_points << "\n";
-        std::vector<double> real_effsource;
-        for(size_t j = 0; j < t_values.size(); j++){
-
+      } catch (const std::runtime_error& e) {
+        std::ofstream singular_field_integrand("/home/user/debug_gsl/singular_field_integral.txt");
+        singular_field_integrand << "times" << "\t" << "singular_field_integrand" << "\n";
+        std::cout << "n_mode_number: " << n_mode_number_ << "\n";
+        std::cout << "omega_r " << Omega_r << "\n";
+        for(double time : t_values)
+        {
+          singular_field_integrand << time << "\t" 
+            << re_interpolated_integrand(time) << "\n";
         }
-        std::cerr << "re_interpolated_effsource " << re_interpolated_gridpoint
-          << "\n";
-    } */
+        singular_field_integrand.close();
+        throw e;
+    }
     result[i] = std::complex<double>(re_integral, im_integral);
   }
   return result;
@@ -172,34 +173,42 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
   get<0>(result).destructive_resize(num_points);
   get<1>(result).destructive_resize(num_points);
 
-  std::vector<double> re_gridpoint_to_interpolate_0(t_values.size());
-  std::vector<double> im_gridpoint_to_interpolate_0(t_values.size());
-  std::vector<double> re_gridpoint_to_interpolate_1(t_values.size());
-  std::vector<double> im_gridpoint_to_interpolate_1(t_values.size());
+  std::vector<double> re_rstar_deriv_integrand(t_values.size());
+  std::vector<double> im_rstar_deriv_integrand(t_values.size());
+  std::vector<double> re_theta_deriv_integrand(t_values.size());
+  std::vector<double> im_theta_deriv_integrand(t_values.size());
 
   std::ofstream re_grid_interp_data("/home/user/spline_testing/data_to_interpolate.txt");
   re_grid_interp_data << "times" << "\t" << "data_to_interpolate" << "\n";
   for (size_t i = 0; i < num_points; i++) {
     for (size_t j = 0; j < t_values.size(); j++) {
-      re_gridpoint_to_interpolate_0[j] = get<0>(time_series_data[j])[i].real();
-      im_gridpoint_to_interpolate_0[j] = get<0>(time_series_data[j])[i].imag();
-      re_gridpoint_to_interpolate_1[j] = get<1>(time_series_data[j])[i].real();
-      im_gridpoint_to_interpolate_1[j] = get<1>(time_series_data[j])[i].imag();
+      std::complex<double> phase_factor = std::exp(std::complex<double>(
+              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t_values[j]));
+      re_rstar_deriv_integrand[j] = 
+        (get<0>(time_series_data[j])[i].real() * phase_factor.real()) - 
+        (get<0>(time_series_data[j])[i].imag() * phase_factor.imag());
+      im_rstar_deriv_integrand[j] = 
+        (get<0>(time_series_data[j])[i].imag() * phase_factor.real()) + 
+        (get<0>(time_series_data[j])[i].real() * phase_factor.imag());
+      re_theta_deriv_integrand[j] = 
+        (get<1>(time_series_data[j])[i].real() * phase_factor.real()) - 
+        (get<1>(time_series_data[j])[i].imag() * phase_factor.imag());
+      im_theta_deriv_integrand[j] = 
+        (get<1>(time_series_data[j])[i].imag() * phase_factor.real()) +
+        (get<1>(time_series_data[j])[i].real() * phase_factor.imag());
       re_grid_interp_data << t_values[j] << "\t"
-        << re_gridpoint_to_interpolate_1[j] << "\n";
+        << re_theta_deriv_integrand[j] << "\n";
     }
 
-    /* change the interpolation */
-
     re_grid_interp_data.close();
-    intrp::CubicSpline re_interpolated_gridpoint_0{
-        t_values, re_gridpoint_to_interpolate_0};
-    intrp::CubicSpline im_interpolated_gridpoint_0{
-        t_values, im_gridpoint_to_interpolate_0};
-    intrp::CubicSpline re_interpolated_gridpoint_1{
-        t_values, re_gridpoint_to_interpolate_1};
-    intrp::CubicSpline im_interpolated_gridpoint_1{
-        t_values, im_gridpoint_to_interpolate_1};
+    intrp::CubicSpline re_interpolated_rstar_integrand{
+        t_values, re_rstar_deriv_integrand};
+    intrp::CubicSpline im_interpolated_rstar_integrand{
+        t_values, im_rstar_deriv_integrand};
+    intrp::CubicSpline re_interpolated_theta_integrand{
+        t_values, re_theta_deriv_integrand};
+    intrp::CubicSpline im_interpolated_theta_integrand{
+        t_values, im_theta_deriv_integrand};
 
     double re_integral_0 = 0;
     double im_integral_0 = 0;
@@ -210,39 +219,28 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
         integration::GslIntegralType::StandardGaussKronrod>
         integration{5000};
     re_integral_0 = integration(
-        [this, &re_interpolated_gridpoint_0,
-         &im_interpolated_gridpoint_0](double t) {
-          std::complex<double> phase_factor = std::exp(std::complex<double>(
-              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t));
-          return (1 / t_values[t_values.size() - 1]) *
-                 (re_interpolated_gridpoint_0(t) * phase_factor.real() -
-                  im_interpolated_gridpoint_0(t) * phase_factor.imag());
-        },
-        0, t_values[t_values.size() - 1], integral_tolerance, 6);
+      [this, &re_interpolated_rstar_integrand](double t) 
+      {
+        return (1 / t_values[t_values.size() - 1]) * 
+        re_interpolated_rstar_integrand(t);
+      },
+      0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
     im_integral_0 = integration(
-        [this, &re_interpolated_gridpoint_0,
-         &im_interpolated_gridpoint_0](double t) {
-          std::complex<double> phase_factor = std::exp(std::complex<double>(
-              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t));
+        [this, &im_interpolated_rstar_integrand](double t) {
           return (1 / t_values[t_values.size() - 1]) *
-                 (im_interpolated_gridpoint_0(t) * phase_factor.real() +
-                  re_interpolated_gridpoint_0(t) * phase_factor.imag());
+          im_interpolated_rstar_integrand(t);
         },
         0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
-        try{
-        re_integral_1 = integration(
-          [this, &re_interpolated_gridpoint_1,
-           &im_interpolated_gridpoint_1](double t) {
-            std::complex<double> phase_factor = std::exp(std::complex<double>(
-                0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t));
-            return (1 / t_values[t_values.size() - 1]) *
-                   (re_interpolated_gridpoint_1(t) * phase_factor.real() -
-                    im_interpolated_gridpoint_1(t) * phase_factor.imag());
-          },
-          0, t_values[t_values.size() - 1], integral_tolerance, 6);
-      } catch(const std::runtime_error& e) {
+    // try{
+      re_integral_1 = integration(
+        [this, &re_interpolated_theta_integrand](double t) {
+          return (1 / t_values[t_values.size() - 1]) *
+          re_interpolated_theta_integrand(t);
+        },
+        0, t_values[t_values.size() - 1], integral_tolerance, 6);
+      /* } catch(const std::runtime_error& e) {
         std::cout << "Integration failed here: " << "\n";
         std::ofstream integrand("/home/user/spline_testing/integrand.txt");
         integrand << "time" << "\t" 
@@ -258,33 +256,22 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
                 0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * test_times[k]));
           integrand << test_times[k] << "\t" 
             <<  (1 / t_values[t_values.size() - 1]) *
-                   (re_interpolated_gridpoint_1(test_times[k]) * phase_factor.real() -
-                    im_interpolated_gridpoint_1(test_times[k]) * phase_factor.imag()) << "\t"
+                  re_interpolated_theta_integrand(test_times[k]) << "\t"
             << (1 / t_values[t_values.size() - 1]) *
-                 (re_interpolated_gridpoint_0(test_times[k]) * phase_factor.real() -
-                  im_interpolated_gridpoint_0(test_times[k]) * phase_factor.imag())
+                 re_interpolated_rstar_integrand(test_times[k])
             << "\n";
         }
         integrand.close();
-        throw e;
-      }
+        throw e; 
+      }*/
 
     im_integral_1 = integration(
-        [this, &re_interpolated_gridpoint_1,
-         &im_interpolated_gridpoint_1](double t) {
-          std::complex<double> phase_factor = std::exp(std::complex<double>(
-              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t));
+        [this, &im_interpolated_theta_integrand](double t) {
           return (1 / t_values[t_values.size() - 1]) *
-                 (im_interpolated_gridpoint_1(t) * phase_factor.real() +
-                  re_interpolated_gridpoint_1(t) * phase_factor.imag());
+          im_interpolated_theta_integrand(t);
         },
         0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
-    std::cout << "Integration failure" << "\n";
-    std::cout << "re_integral_0: " << re_integral_0 << "\n";
-    std::cout << "im_integral_0: " << im_integral_0 << "\n";
-    std::cout << "re_integral_1: " << re_integral_1 << "\n";
-    std::cout << "im_integral_1: " << im_integral_1 << "\n";
     get<0>(result)[i] = std::complex<double>(re_integral_0, im_integral_0);
     get<1>(result)[i] = std::complex<double>(re_integral_1, im_integral_1);
   }
@@ -303,6 +290,10 @@ korb_params orbpar;
 void EccentricOrbit::compute_trajectory(size_t time_points) {
   korb_getparams(ecc, inclined, black_hole_spin_, semi_latus_rectum_,
                  eccentricity_, x_inclination, err, &orbpar);
+  if(eccentricity_ == 0)
+  {
+    orbpar.wr = orbpar.wphi; // For eccentricity = 0 case
+  }
   energy = orbpar.E;
   angular_momentum = orbpar.Lz;
   Omega_r = orbpar.wr;
@@ -311,11 +302,6 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
   phi_of_t.resize(time_points);
   t_values.resize(time_points);
   u_r.resize(time_points);
-  if(eccentricity_ == 0)
-  {
-    orbpar.wr = orbpar.wphi; // For eccentricity = 0 case
-
-  }
   double lambda_max = 2 * M_PI / (orbpar.Ga * orbpar.wr);
   double delta_lambda = lambda_max / (time_points - 1);
   double t_max = 2 * M_PI / (orbpar.wr);
@@ -548,7 +534,6 @@ EccentricOrbit::variables(
   }
 
   {
-    std::lock_guard<std::mutex> lock(*effsource_mutex);
     // Call into effsource
     coordinate x_i{};
     std::array<double, 2> PhiS{};
@@ -639,13 +624,13 @@ EccentricOrbit::variables(
   }
   try{
   get(singular_field) =
-      compute_n_mode(singular_field_evolution, num_points, 1e-10);
+      compute_n_mode(singular_field_evolution, num_points, 1e-12);
   } catch(const std::runtime_error& error){
     std::cerr << "Integration failed  on singular field " << "\n";
   }
   try{
   deriv_singular_field =
-      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-10);
+      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-12);
   } catch(const std::runtime_error& error){
     std::cerr << "Failed on deriv_singular_field " << "\n";
     std::ofstream integral_data("/home/user/field_points.txt");
@@ -677,7 +662,7 @@ EccentricOrbit::variables(
   }
   try{
   get(effective_source) =
-    compute_n_mode(effective_source_evolution, num_points, 1e-10);
+    compute_n_mode(effective_source_evolution, num_points, 1e-12);
   } catch(const std::runtime_error& error){
     std::cerr << "Failed on effsource integration" << "\n";
   }

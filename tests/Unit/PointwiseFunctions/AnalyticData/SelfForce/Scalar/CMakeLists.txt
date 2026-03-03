@@ -5,8 +5,8 @@ set(LIBRARY "Test_ScalarSelfForceAnalyticData")
 
 set(LIBRARY_SOURCES
   #Test_CircularOrbit.cpp
-  Test_EccentricOrbit.cpp
-  #Test_GslInterpolation.cpp
+  #Test_EccentricOrbit.cpp
+  Test_GslInterpolation.cpp
   )
 
 add_test_library(${LIBRARY} "${LIBRARY_SOURCES}")
@@ -20,7 +20,7 @@ target_link_libraries(
   ScalarSelfForceAnalyticData
   Domain
   DomainCreators
+  Integration
   LinearOperators
   KerrGeodesicsC
-  Integration
   )
