@@ -64,7 +64,7 @@ void CubicSpline::initialize_interpolant() {
   acc_ = std::unique_ptr<gsl_interp_accel, gsl_interp_accel_deleter>{
       gsl_interp_accel_alloc()};
   spline_ = std::unique_ptr<gsl_spline, gsl_spline_deleter>{
-      gsl_spline_alloc(gsl_interp_cspline, num_points)};
+      gsl_spline_alloc(gsl_interp_cspline_periodic, num_points)};
   gsl_spline_init(spline_.get(), x_values_.data(), y_values_.data(),
                   num_points);
 }

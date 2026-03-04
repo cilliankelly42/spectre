@@ -33,11 +33,11 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   // the puncture.
 
   // Set up a domain
-  const double costheta_offset = 0.1;
+  const double costheta_offset = 0.5;
   const double delta_costheta = 0.2;
   const double rstar_offset = 0.;
   const double delta_rstar = 5.;
-  const size_t npoints = 2;
+  const size_t npoints = 20;
   const domain::creators::Rectangle domain_creator{
       {{rstar_offset, costheta_offset}},
       {{rstar_offset + delta_rstar, costheta_offset + delta_costheta}},
@@ -65,7 +65,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
 
     CAPTURE(n_mode_number);
     const auto eccentric_orbit = EccentricOrbit{
-        1., 0.5, 10., 0, 0, n_mode_number,
+        1., 0.5, 10., 0.1, 1, n_mode_number,
         {{-25., -5., 20., 40.}}, false, 500};
     //CAPTURE(eccentric_orbit.puncture_position());
     const auto background =
@@ -80,18 +80,12 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(
         vars);
     const auto& effective_source = get<::Tags::FixedSource<Tags::MMode>>(vars);
-    std::cout << "singular_field" << "\n" 
-      << singular_field << "\n";
-      /* << "deriv_singular_field" << "\n"
-      << deriv_singular_field << "\n"
-      <<"effective source: " << "\n"
-      << effective_source  << "\n"; */
 
     double mass = eccentric_orbit.black_hole_mass();
 
     const auto numeric_deriv_singular_field =
         partial_derivative(singular_field, mesh, inv_jacobian);
-    const Approx custom_approx = Approx::custom().epsilon(1.e-8).scale(1.);
+    const Approx custom_approx = Approx::custom().epsilon(1.e-10).scale(1.);
     for (size_t i = 0; i < deriv_singular_field.size(); ++i) {
       CAPTURE(i);
       CHECK_ITERABLE_CUSTOM_APPROX(numeric_deriv_singular_field[i],

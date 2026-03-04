@@ -132,7 +132,33 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
     double re_integral = 0;
     double im_integral = 0;
 
-    try{
+    /* std::ofstream integrand_full_steps("/home/user/debug_gsl/full_step.txt");
+    std::ofstream integrand_half_steps("/home/user/debug_gsl/half_step.txt");
+    integrand_full_steps << "time" << "\t"
+      << "re_integrand_full_step" << "\t" 
+      << "im_integrand_full_step" << "\n";
+    integrand_half_steps << "time" << "\t"
+      << "re_integrand_half_step" << "\t"
+      << "im_integrand_half_step" << "\n";
+    double dt = (t_values[1] - t_values[0]);
+    for(size_t k=0; k < time_points_; k++)
+    {
+      double full_step = k*dt;
+      integrand_full_steps << full_step << "\t"
+        << re_interpolated_integrand(full_step)  << "\t"
+        << im_interpolated_integrand(full_step) << "\n";
+    }
+    for(size_t k=0; k < time_points_ - 1; k++)
+    {
+      double half_step = (k*dt) + (dt/2);
+      integrand_half_steps << half_step << "\t"
+        << re_interpolated_integrand(half_step) << "\t"
+        << im_interpolated_integrand(half_step) << "\n";
+    }
+    integrand_full_steps.close();
+    integrand_half_steps.close(); */
+
+    // try{
     re_integral = integration(
         [this, &re_interpolated_integrand](double t) {
           return (1 / t_values[t_values.size() - 1]) *
@@ -146,8 +172,9 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
           im_interpolated_integrand(t);
         },
         0, t_values[t_values.size() - 1], integral_tolerance, 6);
-
+/*
       } catch (const std::runtime_error& e) {
+        std::cout << "integration is FAILING";
         std::ofstream singular_field_integrand("/home/user/debug_gsl/singular_field_integral.txt");
         singular_field_integrand << "times" << "\t" << "singular_field_integrand" << "\n";
         std::cout << "n_mode_number: " << n_mode_number_ << "\n";
@@ -159,7 +186,7 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
         }
         singular_field_integrand.close();
         throw e;
-    }
+    } */
     result[i] = std::complex<double>(re_integral, im_integral);
   }
   return result;
@@ -622,16 +649,18 @@ EccentricOrbit::variables(
       }
     }
   }
-  try{
+  // try{
   get(singular_field) =
-      compute_n_mode(singular_field_evolution, num_points, 1e-12);
-  } catch(const std::runtime_error& error){
+      compute_n_mode(singular_field_evolution, num_points, 1e-10);
+  /* } catch(const std::runtime_error& error){
     std::cerr << "Integration failed  on singular field " << "\n";
-  }
-  try{
+  } */
+  // try{
+
   deriv_singular_field =
-      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-12);
-  } catch(const std::runtime_error& error){
+      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-10);
+
+  /* } catch(const std::runtime_error& error){
     std::cerr << "Failed on deriv_singular_field " << "\n";
     std::ofstream integral_data("/home/user/field_points.txt");
     if(integral_data.is_open()){
@@ -659,13 +688,14 @@ EccentricOrbit::variables(
       }
     std::cout << "Written to file" << "\n";
     }
-  }
-  try{
+  } */
+
+  // try{
   get(effective_source) =
-    compute_n_mode(effective_source_evolution, num_points, 1e-12);
-  } catch(const std::runtime_error& error){
+    compute_n_mode(effective_source_evolution, num_points, 1e-10);
+  /* } catch(const std::runtime_error& error){
     std::cerr << "Failed on effsource integration" << "\n";
-  }
+  } */
   return result;
 }
 

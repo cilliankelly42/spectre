@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstddef>
+#include <gsl/gsl_sf_trig.h>
 #include <istream>
 #include <limits>
 #include <random>
@@ -42,16 +43,15 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.TestSpline",
             << interpolant(t) << "\n";
     }
     interpolated_data.close(); */
-    /* const integration::GslQuadAdaptive<
+    const integration::GslQuadAdaptive<
         integration::GslIntegralType::StandardGaussKronrod>
         integration{5000};
 
     double integral = integration(
-            [](double t){ return exp(std::complex<double>(0, t)); },
+            [](double t){ return std::exp(std::complex<double>(0,t)).real(); },
             0,
-            2 * M_PI,
-            0, 6, 1e-12
+            2 * M_PI, 0, 6, 1e-3
             );
-    std::cout << integral << "\n"; */
+    std::cout << std::format("{}",integral) << "\n";
 }
 } // Namespace ScalarSelfForce::AnalyticData
