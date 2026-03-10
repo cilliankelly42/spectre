@@ -4,8 +4,8 @@
 set(LIBRARY "Test_ScalarSelfForceAnalyticData")
 
 set(LIBRARY_SOURCES
-  Test_CircularOrbit.cpp
-  #Test_EccentricOrbit.cpp
+  #Test_CircularOrbit.cpp
+  Test_EccentricOrbit.cpp
   #Test_GslInterpolation.cpp
   )
 

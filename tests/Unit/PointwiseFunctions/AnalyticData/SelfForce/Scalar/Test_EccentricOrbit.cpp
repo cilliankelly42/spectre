@@ -19,6 +19,7 @@
 #include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
 #include "NumericalAlgorithms/Spectral/LogicalCoordinates.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
+#include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
 
@@ -65,9 +66,9 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
 
     CAPTURE(n_mode_number);
     const auto eccentric_orbit = EccentricOrbit{
-        1., 0.5, 10., 0.1, 1, n_mode_number,
+        1., 0.5, 10., 0, 1, n_mode_number,
         {{-25., -5., 20., 40.}}, false, 500};
-    //CAPTURE(eccentric_orbit.puncture_position());
+    std::cout << "puncture at:" << eccentric_orbit.puncture_position() << "\n";
     const auto background =
         eccentric_orbit.variables(x, EccentricOrbit::background_tags{});
     const auto& alpha = get<Tags::Alpha>(background);
@@ -80,6 +81,10 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(
         vars);
     const auto& effective_source = get<::Tags::FixedSource<Tags::MMode>>(vars);
+    /* std::cout << "rstar is: " << 
+      gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(10, 1, 0.5) + 
+        (1. + sqrt(1. - square(eccentric_orbit.black_hole_spin())))
+      << "\n"; */
 
     double mass = eccentric_orbit.black_hole_mass();
 

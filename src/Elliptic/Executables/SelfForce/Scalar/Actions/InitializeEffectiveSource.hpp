@@ -236,10 +236,19 @@ struct InitializeEffectiveSource : tt::ConformsTo<::amr::protocols::Projector> {
       singular_vars_on_mortar.initialize(
           mortar_inertial_coords.begin()->size());
       get<Tags::SingularField>(singular_vars_on_mortar) =
-          get<Tags::SingularField>(vars_on_mortar);
+          get<Tags::SingularField>(vars_on_mortar);//compute_n_mode_integral of
+                                                   //time series data of this
+      //Need to generate the time series data of this and store it here...Could
+      //create a member variable for now which stores the time series data and
+      //then just assign the n_mode integrals here. A very inefficient and hacky
+      //way but could check to see if the results are good. 
+      get<Tags::SingularField>(singular_vars_on_mortar) = 
+        eccentric_orbit.compute_n_mode(get<Tags::SingularField>(vars_on_mortar))
+
       const auto& deriv_singular_field_on_mortar = get<
           ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(
-          vars_on_mortar);
+          vars_on_mortar); // Compute_n_mode_integral of time series data of
+                           // this too
       const auto& alpha_on_mortar = get<Tags::Alpha>(background_on_mortar);
       tnsr::I<ComplexDataVector, Dim> singular_field_flux_on_mortar{};
       ScalarSelfForce::fluxes(make_not_null(&singular_field_flux_on_mortar),

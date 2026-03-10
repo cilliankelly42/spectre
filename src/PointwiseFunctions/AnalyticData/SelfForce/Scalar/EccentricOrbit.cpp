@@ -28,6 +28,7 @@ extern "C" {
 #include <gsl/gsl_errno.h>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <utility>
 
 #include "DataStructures/Blaze/IntegerPow.hpp"
@@ -451,8 +452,6 @@ tuples::TaggedTuple<Tags::MMode> EccentricOrbit::variables(
 }
 
 // Fixed sources
-// Remove the evolution stuff from this and return the n-modes into the
-// singular field and deriv_singular field
 tuples::TaggedTuple<
     ::Tags::FixedSource<Tags::MMode>, Tags::SingularField,
     ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
@@ -498,7 +497,7 @@ EccentricOrbit::variables(
     cos_theta_sq = square(cos_theta_or_sq);
   }
   const DataVector r_minus_r_plus =
-      gr::boyer_lindquist_radius_minus_r_plus_from_tortoise(r_star, M,
+    gr::boyer_lindquist_radius_minus_r_plus_from_tortoise(r_star, M,
                                                             black_hole_spin_);
   const DataVector r = r_minus_r_plus + r_plus;
   const DataVector delta = r_minus_r_plus * (r - r_minus);
@@ -560,7 +559,9 @@ EccentricOrbit::variables(
     get(inner_array).destructive_resize(num_points);
   }
 
+  size_t gridpoint = 0;
   {
+    std::lock_guard<std::mutex> lock(*effsource_mutex);
     // Call into effsource
     coordinate x_i{};
     std::array<double, 2> PhiS{};
@@ -580,6 +581,10 @@ EccentricOrbit::variables(
       effsource_set_particle(&xp, energy, angular_momentum, u_r[i]);
 
       for (size_t j = 0; j < num_points; j++) {
+        if((12.75 < get<0>(x)[j]) && (get<0>(x)[j] < 12.78))
+        {
+          gridpoint = j;
+        }
         x_i.r = r[j];
         x_i.theta = acos(cos_theta[j]);
         x_i.phi = 0;
@@ -651,16 +656,15 @@ EccentricOrbit::variables(
   }
   // try{
   get(singular_field) =
-      compute_n_mode(singular_field_evolution, num_points, 1e-10);
+      compute_n_mode(singular_field_evolution, num_points, 1e-8);
   /* } catch(const std::runtime_error& error){
     std::cerr << "Integration failed  on singular field " << "\n";
   } */
-  // try{
 
+  try{
   deriv_singular_field =
-      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-10);
-
-  /* } catch(const std::runtime_error& error){
+      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-8);
+  } catch(const std::runtime_error& error){
     std::cerr << "Failed on deriv_singular_field " << "\n";
     std::ofstream integral_data("/home/user/field_points.txt");
     if(integral_data.is_open()){
@@ -686,15 +690,48 @@ EccentricOrbit::variables(
             get(singular_field_evolution[j])[i].imag() << "\n";
         }
       }
+    integral_data.close();
     std::cout << "Written to file" << "\n";
+    throw error;
     }
-  } */
+  }
 
   // try{
   get(effective_source) =
-    compute_n_mode(effective_source_evolution, num_points, 1e-10);
+    compute_n_mode(effective_source_evolution, num_points, 1e-8);
   /* } catch(const std::runtime_error& error){
     std::cerr << "Failed on effsource integration" << "\n";
+  } */
+
+  /* if(gridpoint != 0)
+  {
+  std::cout << puncture_position() << "\n";
+  std::cout << gridpoint << "\n";
+  std::ofstream all_data("/home/user/field_data.txt");
+  if(all_data.is_open()){
+    all_data << "r_star" << "\t" << "cos(theta)" << "\t" << "time" << "\t" << 
+      "re(rstar_deriv_singular_field)" << "\t" << 
+      "im(rstar_deriv_singular_field)"<< "\t" << 
+      "re(costheta_deriv_sing_field)" << "\t" <<
+      "im(costheta_deriv_sing_field)" << "\t" << 
+      "re(effsource)" << "\t" << "im(effsource)"<< "\t"
+      "real_singular_field" << "\t" << "imag_singular_field" <<"\n";
+
+    for(size_t j=0; j < time_points_; j++){
+      all_data << get<0>(x)[gridpoint] << "\t" << get<1>(x)[gridpoint] << "\t" << 
+      t_values[j] << "\t" << 
+      get<0>(deriv_singular_field_evolution[j])[gridpoint].real() << "\t" <<
+      get<0>(deriv_singular_field_evolution[j])[gridpoint].imag() << "\t" <<
+      get<1>(deriv_singular_field_evolution[j])[gridpoint].real() << "\t" <<
+      get<1>(deriv_singular_field_evolution[j])[gridpoint].imag() << "\t" << 
+      get(effective_source_evolution[j])[gridpoint].real() << "\t" <<
+      get(effective_source_evolution[j])[gridpoint].imag() << "\t"  << 
+      get(singular_field_evolution[j])[gridpoint].real() << "\t" <<
+      get(singular_field_evolution[j])[gridpoint].imag() << "\n";
+    }
+  }
+  all_data.close();
+  std::cout << "Written to file" << "\n"; 
   } */
   return result;
 }
