@@ -154,6 +154,9 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
       const tnsr::I<DataVector, 2>& x, tmpl::list<Tags::MMode> /*meta*/);
 
   // Fixed sources
+  // Pass a boolean which says whether or not you want to compute the 
+  // n_modes of the puncture and its derivatives (should be true only when 
+  // crossing the worldtube only)
   tuples::tagged_tuple_from_typelist<source_tags> variables(
       const tnsr::I<DataVector, 2>& x, source_tags /*meta*/) const;
 
@@ -207,4 +210,4 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
 
 bool operator!=(const EccentricOrbit& lhs, const EccentricOrbit& rhs);
 
-}  // namespace ScalarSelfForce::AnalyticData'numToStr/Comment.nvim',
+}  // namespace ScalarSelfForce::AnalyticData

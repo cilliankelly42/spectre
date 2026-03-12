@@ -30,6 +30,11 @@ std::array<amr::Flag, 2> RefineAtPuncture::impl(
             background)
             .puncture_position();
 
+    // Just say that the puncture is a range of r values from rmin to rmax 
+    // and then if that range of r values is in the current block, split? So 
+    // it would be like 'having a continuum of punctures' along a line instead
+    // of just one at a point
+
     // Split (h-refine) the element if it contains the puncture
     const auto& block = domain.blocks()[element_id.block_id()];
     // Check if the puncture is in the block
