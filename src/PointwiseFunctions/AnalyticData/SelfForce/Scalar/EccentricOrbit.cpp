@@ -451,17 +451,18 @@ tuples::TaggedTuple<Tags::MMode> EccentricOrbit::variables(
   return result;
 }
 
-// TODO: Add a boolean to the arguments of the fixed source function. When true
-// (i.e. when field point on the worltube boundary) compute the n_mode integrals 
-// of the singular field and its derivaitives. When false don't
-//
+// TODO skip the entire calculation of the n_modes of the puncture and its 
+// derivatives when on_worldtube_boundary=false. Currently, the time evolution 
+// of both of these are always computed, the only part that is skipped in the 
+// regularised region is the actual n_mode integral itself.
+
 // Fixed sources
 tuples::TaggedTuple<
     ::Tags::FixedSource<Tags::MMode>, Tags::SingularField,
     ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
     Tags::BoyerLindquistRadius>
 EccentricOrbit::variables(
-    const tnsr::I<DataVector, 2>& x,
+    const tnsr::I<DataVector, 2>& x, bool on_worldtube_boundary,
     tmpl::list<
         ::Tags::FixedSource<Tags::MMode>, Tags::SingularField,
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
@@ -600,6 +601,7 @@ EccentricOrbit::variables(
         get(effective_source_evolution[i]) = get(snapshot_effective_source);
       }
       get(singular_field_evolution[i]) = get(snapshot_singular_field);
+
       get<0>(deriv_singular_field_evolution[i]) =
           get<0>(snapshot_deriv_singular_field);
       get<1>(deriv_singular_field_evolution[i]) =
@@ -654,16 +656,18 @@ EccentricOrbit::variables(
     }
   }
 
-  /* if boolean (on_worltube_boundary)is True compute these n_modes
-  get(singular_field) =
-      compute_n_mode(singular_field_evolution, num_points, 1e-8);
+  // only compute the n_modes of the singular field and its derivatives when 
+  // crossing the worldtube
+  if(on_worldtube_boundary){
+    get(singular_field) =
+      compute_n_mode(singular_field_evolution, num_points, 1e-10);
 
-  deriv_singular_field =
-      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-8);
- */
+    deriv_singular_field =
+      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-10);
+  }
 
   get(effective_source) =
-    compute_n_mode(effective_source_evolution, num_points, 1e-8);
+    compute_n_mode(effective_source_evolution, num_points, 1e-10);
 
   return result;
 }

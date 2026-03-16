@@ -25,15 +25,17 @@ std::array<amr::Flag, 2> RefineAtPuncture::impl(
         dynamic_cast<const ScalarSelfForce::AnalyticData::CircularOrbit&>(
             background)
             .puncture_position(); */
+
+    //Just use background here.. No dynamic cast, then setup a self force 
+    //version of the elliptic background class where you define virtual 
+    //functions for all of the functions in each class. 
+
     const auto puncture_position =
         dynamic_cast<const ScalarSelfForce::AnalyticData::EccentricOrbit&>(
             background)
             .puncture_position();
 
-    // Just say that the puncture is a range of r values from rmin to rmax 
-    // and then if that range of r values is in the current block, split? So 
-    // it would be like 'having a continuum of punctures' along a line instead
-    // of just one at a point
+    // Compare endpoints current block with rmin and rmax (endpoints of line)
 
     // Split (h-refine) the element if it contains the puncture
     const auto& block = domain.blocks()[element_id.block_id()];

@@ -186,11 +186,10 @@ struct InitializeEffectiveSource : tt::ConformsTo<::amr::protocols::Projector> {
     }
 
     // Set the effective source if solving for the regular field
-    // TODO Set the boolean to false here (only compute n_mode integrals of the 
-    // effective source)
     if (*field_is_regularized) {
       const auto vars =
-          eccentric_orbit.variables(inertial_coords, analytic_tags_list{});
+          eccentric_orbit.variables(
+              inertial_coords, false, analytic_tags_list{});
       fixed_sources->initialize(mesh.number_of_grid_points());
       singular_vars->initialize(mesh.number_of_grid_points());
       get<::Tags::FixedSource<Tags::MMode>>(*fixed_sources) =
@@ -221,8 +220,6 @@ struct InitializeEffectiveSource : tt::ConformsTo<::amr::protocols::Projector> {
     // Set the singular field and flux on mortars to transform between
     // regularized and full fields
     singular_vars_on_mortars->clear();
-    //TODO Set the boolean to true here (compute all n_mode integrals on the 
-    //boundary)
     for (const auto& [mortar_id, mortar_inertial_coords] :
          all_mortar_inertial_coords) {
       if (*field_is_regularized ==
@@ -232,7 +229,7 @@ struct InitializeEffectiveSource : tt::ConformsTo<::amr::protocols::Projector> {
         continue;
       }
       const auto vars_on_mortar = eccentric_orbit.variables(
-          mortar_inertial_coords, analytic_tags_list{});
+          mortar_inertial_coords, true, analytic_tags_list{});
       const auto background_on_mortar = eccentric_orbit.variables(
           mortar_inertial_coords, typename ScalarSelfForce::AnalyticData::
                                       EccentricOrbit::background_tags{});

@@ -29,7 +29,13 @@
 
 namespace ScalarSelfForce::AnalyticData {
 
-class EccentricOrbit : public elliptic::analytic_data::Background,
+class EccentricOrbit : public elliptic::analytic_data::Background,//Need to
+                                                                  //change this
+                                                                  //to the self
+                                                                  //force
+                                                                  //version of
+                                                                  //the
+                                                                  //background
                       public elliptic::analytic_data::InitialGuess {
  public:
   struct BlackHoleMass {
@@ -158,7 +164,8 @@ class EccentricOrbit : public elliptic::analytic_data::Background,
   // n_modes of the puncture and its derivatives (should be true only when 
   // crossing the worldtube only)
   tuples::tagged_tuple_from_typelist<source_tags> variables(
-      const tnsr::I<DataVector, 2>& x, source_tags /*meta*/) const;
+      const tnsr::I<DataVector, 2>& x, bool on_worldtube_boundary,
+      source_tags /*meta*/) const;
 
   template <typename... RequestedTags>
   tuples::TaggedTuple<RequestedTags...> variables(
