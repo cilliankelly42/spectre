@@ -24,6 +24,8 @@
 #include "NumericalAlgorithms/Spectral/Mesh.hpp"
 #include "Options/Auto.hpp"
 #include "Options/String.hpp"
+//#include "PointwiseFunctions/InitialDataUtilities/Background.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/Background.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/InitialGuess.hpp"
 #include "Utilities/Gsl.hpp"
@@ -32,13 +34,7 @@
 
 namespace ScalarSelfForce::AnalyticData {
 
-class EccentricOrbit : public elliptic::analytic_data::Background,//Need to
-                                                                  //change this
-                                                                  //to the self
-                                                                  //force
-                                                                  //version of
-                                                                  //the
-                                                                  //background
+class EccentricOrbit : public SelfForceBackground,
                       public elliptic::analytic_data::InitialGuess {
  public:
   struct BlackHoleMass {
@@ -121,15 +117,12 @@ class EccentricOrbit : public elliptic::analytic_data::Background,//Need to
   using PUP::able::register_constructor;
   WRAPPED_PUPable_decl_template(EccentricOrbit);
 
-
-  tnsr::I<double, 2> puncture_position() const;
-  /* boost::geometry::model::box<boost::geometry::model::d2::point_xy<double>> 
-    puncture_position() const; */
-  double black_hole_mass() const { return black_hole_mass_; }
-  double black_hole_spin() const { return black_hole_spin_; }
-  double semi_latus_rectum() const { return semi_latus_rectum_; }
+  tnsr::I<double, 2> puncture_position() const override;
+  double black_hole_mass() const override { return black_hole_mass_; }
+  double black_hole_spin() const override { return black_hole_spin_; }
+  double semi_latus_rectum() const override { return semi_latus_rectum_; }
   double eccentricity() const { return eccentricity_; }
-  int m_mode_number() const { return m_mode_number_; }
+  int m_mode_number() const override { return m_mode_number_; }
   int n_mode_number() const { return n_mode_number_ ; }
   size_t time_points() const { return time_points_; }
   std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions()
@@ -140,11 +133,6 @@ class EccentricOrbit : public elliptic::analytic_data::Background,//Need to
     return impose_equatorial_symmetry_;
   }
 
-  using evolution_tags = tmpl::list<
-    Tags::EffectiveSourceEvolution,
-    Tags::SingularFieldEvolution,
-    Tags::DerivSingularFieldEvolution
-    >;
   using background_tags =
       typename ScalarSelfForce::FirstOrderSystem::background_fields;
   using source_tags = tmpl::list<
@@ -153,13 +141,9 @@ class EccentricOrbit : public elliptic::analytic_data::Background,//Need to
       ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
       Tags::BoyerLindquistRadius>;
 
-  // Evolve the m-mode puncture, derivatives and effective source
-  void evolve_sources(
-      const tnsr::I<DataVector, 2>& x, evolution_tags);
-
   // Background
   tuples::tagged_tuple_from_typelist<background_tags> variables(
-      const tnsr::I<DataVector, 2>& x, background_tags /*meta*/) const;
+      const tnsr::I<DataVector, 2>& x, background_tags /*meta*/) const override;
 
   // Initial guess
   static tuples::TaggedTuple<Tags::MMode> variables(
@@ -171,7 +155,7 @@ class EccentricOrbit : public elliptic::analytic_data::Background,//Need to
   // crossing the worldtube only)
   tuples::tagged_tuple_from_typelist<source_tags> variables(
       const tnsr::I<DataVector, 2>& x, bool on_worldtube_boundary,
-      source_tags /*meta*/) const;
+      source_tags /*meta*/) const override;
 
   template <typename... RequestedTags>
   tuples::TaggedTuple<RequestedTags...> variables(

@@ -46,6 +46,7 @@
 #include "ParallelAlgorithms/LinearSolver/Multigrid/Tags.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/CircularOrbit.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/AnalyticSolution.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/Background.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/InitialGuess.hpp"
@@ -87,7 +88,7 @@ struct Metavariables {
         tmpl::pair<DomainCreator<volume_dim>,
                    tmpl::list<domain::creators::Rectangle,
                               domain::creators::AlignedLattice<2>>>,
-        tmpl::pair<elliptic::analytic_data::Background,
+        tmpl::pair<ScalarSelfForce::AnalyticData::SelfForceBackground,
                    tmpl::list<
                    ScalarSelfForce::AnalyticData::CircularOrbit,
                    ScalarSelfForce::AnalyticData::EccentricOrbit>

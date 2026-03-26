@@ -35,6 +35,7 @@
 #include "ParallelAlgorithms/Initialization/MutateAssign.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/CircularOrbit.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
 #include "Utilities/CallWithDynamicType.hpp"
 #include "Utilities/MakeWithValue.hpp"
 #include "Utilities/TMPL.hpp"
@@ -140,7 +141,7 @@ struct InitializeEffectiveSource : tt::ConformsTo<::amr::protocols::Projector> {
         dynamic_cast<const ScalarSelfForce::AnalyticData::CircularOrbit&>(
             background); */
     const auto& eccentric_orbit =
-      dynamic_cast<const ScalarSelfForce::AnalyticData::EccentricOrbit&>(
+      dynamic_cast<const ScalarSelfForce::AnalyticData::SelfForceBackground&>(
           background);
 
     // Check if this element and its neighbors solve for the regular field or

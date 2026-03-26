@@ -17,6 +17,7 @@
 #include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "Elliptic/Systems/SelfForce/Scalar/Tags.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
 #include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/Math.hpp"
@@ -52,13 +53,10 @@ CircularOrbit::CircularOrbit(const double black_hole_mass,
       orbital_radius_(orbital_radius),
       m_mode_number_(m_mode_number),
       hyperboloidal_slicing_transitions_(hyperboloidal_slicing_transitions),
-      impose_equatorial_symmetry_(impose_equatorial_symmetry) {
-        std::cout << "Circular puncture position is:" << puncture_position()
-          << "\n\n";
-      }
+      impose_equatorial_symmetry_(impose_equatorial_symmetry) {}
 
 CircularOrbit::CircularOrbit(CkMigrateMessage* m)
-    : elliptic::analytic_data::Background(m),
+    : SelfForceBackground(m),
       elliptic::analytic_data::InitialGuess(m) {}
 
 tnsr::I<double, 2> CircularOrbit::puncture_position() const {
@@ -157,7 +155,7 @@ tuples::TaggedTuple<
     ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
     Tags::BoyerLindquistRadius>
 CircularOrbit::variables(
-    const tnsr::I<DataVector, 2>& x,
+    const tnsr::I<DataVector, 2>& x, bool on_worldtube_boundary,
     tmpl::list<
         ::Tags::FixedSource<Tags::MMode>, Tags::SingularField,
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
@@ -304,7 +302,7 @@ CircularOrbit::variables(
 }
 
 void CircularOrbit::pup(PUP::er& p) {
-  elliptic::analytic_data::Background::pup(p);
+  SelfForceBackground::pup(p);
   elliptic::analytic_data::InitialGuess::pup(p);
   p | black_hole_mass_;
   p | black_hole_spin_;

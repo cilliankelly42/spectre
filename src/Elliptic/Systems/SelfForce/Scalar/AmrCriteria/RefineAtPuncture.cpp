@@ -41,7 +41,7 @@ std::array<amr::Flag, 2> RefineAtPuncture::impl(
                 );
 
 
-    const auto puncture_position = eccentric_orbit.puncture_position();
+    // const auto puncture_position = eccentric_orbit.puncture_position();
 
     /* const auto puncture_position =
         dynamic_cast<const ScalarSelfForce::AnalyticData::EccentricOrbit&>(

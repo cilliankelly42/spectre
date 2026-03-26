@@ -24,6 +24,7 @@
 #include <string>
 
 #include "DataStructures/Tensor/IndexType.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
 #include "Utilities/TaggedTuple.hpp"
 extern "C" {
 #include "korb.h"
@@ -94,8 +95,7 @@ EccentricOrbit::EccentricOrbit(const double black_hole_mass,
 }
 
 EccentricOrbit::EccentricOrbit(CkMigrateMessage* m)
-    : elliptic::analytic_data::Background(m),
-      elliptic::analytic_data::InitialGuess(m) {}
+    : SelfForceBackground(m), elliptic::analytic_data::InitialGuess(m) {}
 
 
 tnsr::I<double, 2> EccentricOrbit::puncture_position() const {
@@ -639,7 +639,7 @@ EccentricOrbit::variables(
 }
 
 void EccentricOrbit::pup(PUP::er& p) {
-  elliptic::analytic_data::Background::pup(p);
+  SelfForceBackground::pup(p);
   elliptic::analytic_data::InitialGuess::pup(p);
   p | black_hole_mass_;
   p | black_hole_spin_;

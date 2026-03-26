@@ -51,6 +51,7 @@
 #include "ParallelAlgorithms/LinearSolver/Tags.hpp"
 #include "ParallelAlgorithms/NonlinearSolver/NewtonRaphson/NewtonRaphson.hpp"
 #include "ParallelAlgorithms/NonlinearSolver/Tags.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/AnalyticSolution.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/Background.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/InitialGuess.hpp"
@@ -115,7 +116,7 @@ struct Solver {
                      typename system::sources_computer>;
 
   using background_tag =
-      elliptic::Tags::Background<elliptic::analytic_data::Background>;
+      elliptic::Tags::Background<ScalarSelfForce::AnalyticData::SelfForceBackground/*elliptic::analytic_data::Background*/>;
   using initial_guess_tag =
       elliptic::Tags::InitialGuess<elliptic::analytic_data::InitialGuess>;
 

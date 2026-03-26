@@ -18,6 +18,7 @@ spectre_target_headers(
   HEADERS
   CircularOrbit.hpp
   EccentricOrbit.hpp
+  SelfForceBackground.hpp
   )
 
 target_link_libraries(
