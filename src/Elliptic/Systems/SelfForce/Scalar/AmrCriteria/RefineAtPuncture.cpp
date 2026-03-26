@@ -17,6 +17,7 @@
 #include "Domain/ElementLogicalCoordinates.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/CircularOrbit.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/Background.hpp"
 #include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
 #include "Utilities/MakeArray.hpp"
@@ -24,7 +25,7 @@
 namespace ScalarSelfForce::AmrCriteria {
 
 std::array<amr::Flag, 2> RefineAtPuncture::impl(
-    const elliptic::analytic_data::Background& background,
+    const ScalarSelfForce::AnalyticData::SelfForceBackground& background,
     const Domain<2>& domain, const ElementId<2>& element_id) {
     /* const auto puncture_position =
         dynamic_cast<const ScalarSelfForce::AnalyticData::CircularOrbit&>(
@@ -35,11 +36,7 @@ std::array<amr::Flag, 2> RefineAtPuncture::impl(
     //version of the elliptic background class where you define virtual 
     //functions for all of the functions in each class. 
 
-    const auto& eccentric_orbit = 
-        dynamic_cast<const ScalarSelfForce::AnalyticData::EccentricOrbit&>(
-                background
-                );
-
+    const auto& eccentric_orbit = background;
 
     // const auto puncture_position = eccentric_orbit.puncture_position();
 

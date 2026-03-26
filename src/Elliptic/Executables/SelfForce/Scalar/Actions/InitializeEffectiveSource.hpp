@@ -140,9 +140,7 @@ struct InitializeEffectiveSource : tt::ConformsTo<::amr::protocols::Projector> {
     /* const auto& circular_orbit =
         dynamic_cast<const ScalarSelfForce::AnalyticData::CircularOrbit&>(
             background); */
-    const auto& eccentric_orbit =
-      dynamic_cast<const ScalarSelfForce::AnalyticData::SelfForceBackground&>(
-          background);
+    const auto& eccentric_orbit = background;
 
     // Check if this element and its neighbors solve for the regular field or
     // the full field

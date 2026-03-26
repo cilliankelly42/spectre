@@ -107,8 +107,7 @@ class ObserveSelfForce : public Event {
     const auto& background = get<BackgroundTag>(box);
     /* const auto& circular_orbit =
         dynamic_cast<const AnalyticData::CircularOrbit&>(background); */
-    const auto& eccentric_orbit=
-        dynamic_cast<const AnalyticData::EccentricOrbit&>(background);
+    const auto& eccentric_orbit = background;
     // Get element-logical coords of puncture
     const auto& domain = get<domain::Tags::Domain<2>>(box);
     const auto puncture_position = eccentric_orbit.puncture_position();

@@ -21,6 +21,7 @@ namespace ScalarSelfForce::AnalyticData{
             virtual double black_hole_mass() const;
             virtual double black_hole_spin() const;
             virtual double semi_latus_rectum() const;
+            virtual double eccentricity() const;
             virtual double orbital_radius() const;
             virtual int m_mode_number() const;
 

@@ -42,22 +42,6 @@ struct MMode : db::SimpleTag {
   using type = Scalar<ComplexDataVector>;
 };
 
-struct NMode : db::SimpleTag {
-  using type = Scalar<ComplexDataVector>;
-};
-
-struct SingularFieldEvolution: db::SimpleTag {
-  using type = std::vector<Scalar<ComplexDataVector>>;
-};
-
-struct DerivSingularFieldEvolution : db::SimpleTag {
-  using type = std::vector<tnsr::i<ComplexDataVector,2>>;
-};
-
-struct EffectiveSourceEvolution : db::SimpleTag {
-  using type = std::vector<Scalar<ComplexDataVector>>;
-};
-
 /*!
  * \brief The factor multiplying the angular derivative in the principal part of
  * the equations.
