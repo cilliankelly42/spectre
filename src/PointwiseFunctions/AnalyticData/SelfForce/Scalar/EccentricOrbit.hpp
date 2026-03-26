@@ -10,6 +10,9 @@
 #include <optional>
 #include <pup.h>
 #include <vector>
+#include <boost/geometry/geometries/box.hpp>
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/point_xy.hpp>
 
 #include "DataStructures/ComplexDataVector.hpp"
 #include "DataStructures/DataBox/Prefixes.hpp"
@@ -118,7 +121,10 @@ class EccentricOrbit : public elliptic::analytic_data::Background,//Need to
   using PUP::able::register_constructor;
   WRAPPED_PUPable_decl_template(EccentricOrbit);
 
+
   tnsr::I<double, 2> puncture_position() const;
+  /* boost::geometry::model::box<boost::geometry::model::d2::point_xy<double>> 
+    puncture_position() const; */
   double black_hole_mass() const { return black_hole_mass_; }
   double black_hole_spin() const { return black_hole_spin_; }
   double semi_latus_rectum() const { return semi_latus_rectum_; }

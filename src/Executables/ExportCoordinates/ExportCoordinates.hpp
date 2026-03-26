@@ -4,15 +4,20 @@
 #pragma once
 
 #include <optional>
+#include <iostream>
 #include <pup.h>
 #include <string>
 
 #include "DataStructures/DataBox/DataBox.hpp"
 #include "DataStructures/DataBox/DataBoxTag.hpp"
+#include "DataStructures/DataVector.hpp"
 #include "DataStructures/Tensor/EagerMath/DeterminantAndInverse.hpp"
+#include "DataStructures/Tensor/IndexType.hpp"
+#include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Domain/Creators/Factory1D.hpp"
 #include "Domain/Creators/Factory2D.hpp"
 #include "Domain/Creators/Factory3D.hpp"
+#include "Domain/ElementMap.hpp"
 #include "Domain/FlatLogicalMetric.hpp"
 #include "Domain/JacobianDiagnostic.hpp"
 #include "Domain/MinimumGridSpacing.hpp"
@@ -34,6 +39,7 @@
 #include "IO/Observer/VolumeActions.hpp"
 #include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
 #include "NumericalAlgorithms/SpatialDiscretization/OptionTags.hpp"
+#include "NumericalAlgorithms/Spectral/LogicalCoordinates.hpp"
 #include "Options/Protocols/FactoryCreation.hpp"
 #include "Options/String.hpp"
 #include "Parallel/AlgorithmExecution.hpp"
@@ -148,6 +154,102 @@ struct ExportCoordinates {
                                       inertial_coordinates.get_tensor_index(d)),
                               inertial_coordinates.get(d));
     }
+
+    components.emplace_back(
+        "Segment_id", std::vector<float>{
+        static_cast<float>(element_id.segment_id(0).index()),
+        static_cast<float>(element_id.segment_id(1).index())
+        });
+
+    // These are the logical coordinates of the elements on the block
+    const float lower_coordinate_0 = 
+      -1 + 2 * (element_id.segment_id(0).index())/pow(2,element_id.refinement_levels()[0]);
+    const float upper_coordinate_0= 
+      -1 + 2 * (1 + element_id.segment_id(0).index())/pow(2,element_id.refinement_levels()[0]);
+    const float lower_coordinate_1 = 
+      -1 + 2 * (element_id.segment_id(1).index())/pow(2,element_id.refinement_levels()[1]);
+    const float upper_coordinate_1 =
+      -1 + 2 * (1 + element_id.segment_id(1).index())/pow(2,element_id.refinement_levels()[1]);
+
+    //Returning the form of inertial coordinates for comparisons:
+    components.emplace_back(
+        "Coord_from_Seg_x", 
+        std::vector<float>{lower_coordinate_0, upper_coordinate_0, lower_coordinate_0, upper_coordinate_0});
+
+    components.emplace_back(
+        "Coord_from_Seg_y",
+        std::vector<float>{lower_coordinate_1, lower_coordinate_1, upper_coordinate_1, upper_coordinate_1});
+
+    // Map the upper and lower coordinates to inertial this is how in refine at
+    // puncture 
+    //
+    /* ElementMap<Dim, Frame::Inertial> logical_to_inertial{element_id, block};
+    const float lower_inertial_0 = logical_to_inertial.block_map(lower_coordinate_0);
+    const float upper_inertial_0 = logical_to_inertial.block_map(upper_coordinate_0);
+    const float lower_inertial_1 = logical_to_inertial.block_map(lower_coordinate_1);
+    const float upper_inertial_1 = logical_to_inertial.block_map(upper_coordinate_1); */
+    //In this scenario I actually want to do get the ElementMap from the box and
+    //use that instead (it uses the block map under the hood)
+    const auto& logical_to_inertial = 
+      db::get<domain::Tags::ElementMap<Dim, Frame::Inertial>>(box);
+    /* tnsr::I<double, 2> lower_corner{{lower_coordinate_0, lower_coordinate_1}};
+    tnsr::I<double, 2> upper_corner{{upper_coordinate_0, upper_coordinate_1}}; */
+    /* const auto lower_corner_inertial = logical_to_inertial(lower_corner);
+    const auto upper_corner_inertial = logical_to_inertial(upper_corner); */
+
+    /* components.emplace_back(
+        "Inert_from_logic_x", get<0>(lower_corner_inertial)
+        ); */
+    /* components.emplace_back(
+        "Inert_from_logic_x",
+        std::vector<float>{
+          static_cast<float>(get<0>(lower_corner_inertial)), 
+          static_cast<float>(get<0>(upper_corner_inertial)), 
+          static_cast<float>(get<0>(lower_corner_inertial)), 
+          static_cast<float>(get<0>(upper_corner_inertial))}
+        );
+
+    components.emplace_back(
+        "Inert_from_logic_y",
+        std::vector<float>{
+          static_cast<float>(get<1>(lower_corner)),
+          static_cast<float>(get<1>(lower_corner)),
+          static_cast<float>(get<1>(upper_corner)), 
+          static_cast<float>(get<1>(upper_corner))}
+        ); */
+
+    /* components.emplace_back(
+        "Coord_from_Seg_x", 
+        std::vector<float>{lower_coordinate_0, upper_coordinate_0});
+
+    components.emplace_back(
+        "Coord_from_Seg_y",
+        std::vector<float>{lower_coordinate_1, upper_coordinate_1}); */
+
+    // So could use the lower and upper coordinates obtained from the line
+    // segments to construct the box in inertial coordinates. try this for a
+    // first pass. I need to convert these into the inertial coordinates
+    //
+    // Alternatively can I just take a map of elementID and block to get the
+    // Element loggical coordinates from the data box and then just map them 
+    // to the global coordaintes using an 
+    // ElementCoordinateMap<Dim, Frame::Inertail>(element_id,block)
+    //
+    // const auto element_to_inertial = db::get<domain::Tags::ElementMap<Dim,Frame::Inertial>>;
+
+    //Map these to the Block logical coordinates
+
+
+    /* const auto& element_map = db::get<domain::Tags::ElementMap<Dim>>(box);
+    const float lower_coordinate */
+
+    /* const auto& logical_coords = db::get<domain::Tags::LogicalCoordinates<Dim>>(box);
+    for (size_t d = 0; d < Dim; d++) {
+      components.emplace_back("Logical_coords_" +
+                                  logical_coords.component_name(
+                                      logical_coords.get_tensor_index(d)),
+                              logical_coords.get(d));
+    } */
 
     for (size_t i = 0; i < deriv_inertial_coordinates.size(); ++i) {
       components.emplace_back(

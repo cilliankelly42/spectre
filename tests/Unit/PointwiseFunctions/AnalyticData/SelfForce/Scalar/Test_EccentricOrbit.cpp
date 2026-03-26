@@ -22,6 +22,7 @@
 #include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
+#include "Domain/BlockLogicalCoordinates.hpp"
 
 namespace ScalarSelfForce::AnalyticData {
 
@@ -34,15 +35,15 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   // the puncture.
 
   // Set up a domain
-  const double costheta_offset = 0.5;
-  const double delta_costheta = 0.2;
-  const double rstar_offset = 0.;
-  const double delta_rstar = 5.;
+  const double costheta_offset = -0.001;
+  const double delta_costheta = 0.0003;
+  const double rstar_offset = 10.;
+  const double delta_rstar = 0.1;
   const size_t npoints = 20;
   const domain::creators::Rectangle domain_creator{
       {{rstar_offset, costheta_offset}},
       {{rstar_offset + delta_rstar, costheta_offset + delta_costheta}},
-      {{0, 0}},
+      {{1, 1}},
       {{npoints, npoints}},
       {{false, false}}};
   const auto domain = domain_creator.create_domain();
@@ -62,31 +63,24 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   CAPTURE(max(cos_theta));
 
   // Get the analytic fields
-  for (int n_mode_number = 1; n_mode_number < 2; ++n_mode_number) {
+  for (int n_mode_number = 0; n_mode_number < 1; ++n_mode_number) {
 
     CAPTURE(n_mode_number);
     const auto eccentric_orbit = EccentricOrbit{
-        1., 0.5, 10., 0, 1, n_mode_number,
+        1., 0.5, 10., 0.1, 2, n_mode_number,
         {{-25., -5., 20., 40.}}, false, 500};
-    std::cout << "puncture at:" << eccentric_orbit.puncture_position() << "\n";
     const auto background =
         eccentric_orbit.variables(x, EccentricOrbit::background_tags{});
     const auto& alpha = get<Tags::Alpha>(background);
     const auto& beta = get<Tags::Beta>(background);
     const auto& gamma = get<Tags::Gamma>(background);
     const auto vars = eccentric_orbit.variables(
-        x, EccentricOrbit::source_tags{});
+        x, true,EccentricOrbit::source_tags{});
     const auto& singular_field = get<Tags::SingularField>(vars);
     const auto& deriv_singular_field = get<
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(
         vars);
     const auto& effective_source = get<::Tags::FixedSource<Tags::MMode>>(vars);
-    /* std::cout << "rstar is: " << 
-      gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(10, 1, 0.5) + 
-        (1. + sqrt(1. - square(eccentric_orbit.black_hole_spin())))
-      << "\n"; */
-
-    double mass = eccentric_orbit.black_hole_mass();
 
     const auto numeric_deriv_singular_field =
         partial_derivative(singular_field, mesh, inv_jacobian);

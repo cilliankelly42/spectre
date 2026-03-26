@@ -165,6 +165,8 @@ struct InitializeEffectiveSource : tt::ConformsTo<::amr::protocols::Projector> {
       //               get<1>(puncture_pos) - worldtube_angular_size and
       //           theta_bounds[0] <= get<1>(puncture_pos) +
       //           worldtube_angular_size);
+      
+      // Have to make bounding box here and check overlap with the block
       const auto block_logical_coords =
           block_logical_coordinates_single_point(puncture_pos, block);
       return block_logical_coords.has_value();
