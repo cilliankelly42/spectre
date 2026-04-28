@@ -9,6 +9,7 @@ spectre_target_sources(
   ${LIBRARY}
   PRIVATE
   CircularOrbit.cpp
+  EccentricOrbit.cpp
   )
 
 spectre_target_headers(
@@ -16,6 +17,7 @@ spectre_target_headers(
   INCLUDE_DIRECTORY ${CMAKE_SOURCE_DIR}/src
   HEADERS
   CircularOrbit.hpp
+  EccentricOrbit.hpp
   )
 
 target_link_libraries(
@@ -25,6 +27,8 @@ target_link_libraries(
   EffectiveSource
   ErrorHandling
   GeneralRelativity
+  Integration
   Options
   Utilities
+  KerrGeodesicsC
   )

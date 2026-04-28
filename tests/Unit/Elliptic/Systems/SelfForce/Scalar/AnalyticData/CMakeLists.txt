@@ -5,6 +5,7 @@ set(LIBRARY "Test_ScalarSelfForceAnalyticData")
 
 set(LIBRARY_SOURCES
   Test_CircularOrbit.cpp
+  Test_EccentricOrbit.cpp
   )
 
 add_test_library(${LIBRARY} "${LIBRARY_SOURCES}")

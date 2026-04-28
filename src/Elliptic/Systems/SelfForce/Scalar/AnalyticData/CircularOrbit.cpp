@@ -217,6 +217,7 @@ CircularOrbit::variables(
           dPhiS_dx[4] + std::complex<double>(0., 1.) * dPhiS_dx[5];
     }
   }
+
   // Rotate the source by delta_phi and multiply by r / 2 pi
   get(effective_source) *= rotation * 0.5 * r / M_PI;
   // Factor Delta * (r^2 + a^2 cos^2(theta)) / Sigma^2

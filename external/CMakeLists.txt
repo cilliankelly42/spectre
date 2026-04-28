@@ -4,6 +4,7 @@
 add_subdirectory(brigand)
 add_subdirectory(EffectiveSource)
 add_subdirectory(GravitationalEffectiveSource)
+add_subdirectory(KerrGeodesicsC)
 add_subdirectory(SPHEREPACK)
 add_subdirectory(slatec)
 
