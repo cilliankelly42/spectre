@@ -8,6 +8,7 @@
 #include <limits>
 #include <pup.h>
 #include <vector>
+#include <stdio.h>
 
 #include "DataStructures/DataBox/Prefixes.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
