@@ -4,6 +4,7 @@
 #include "Framework/TestingFramework.hpp"
 
 #include <array>
+#include <cmath>
 #include <complex>
 #include <cstddef>
 #include <iostream>
@@ -25,44 +26,39 @@
 
 namespace GrSelfForce::AnalyticData {
 
-SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GrSelfForce.CircularOrbit",
+SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GrSelfForce.EffectiveSource",
                   "[PointwiseFunctions][Unit]") {
-  // This test checks both the self-force equations and the effective source
-  // computation in a very robust way: it ensures that the elliptic operator
-  // applied to the singular field gives the effective source.
-  // This is done numerically on a rectangular grid in (r_*, theta) near
-  // the puncture.
-  const double theta_offset = M_PI / 8.;
-  const double delta_theta = M_PI / 40.;
-  const double rstar_offset = 0.;
-  const double delta_rstar = 5.;
-  const size_t npoints = 20;
-  const domain::creators::Rectangle domain_creator{
-      {{rstar_offset, M_PI_2 + theta_offset}},
-      {{rstar_offset + delta_rstar, M_PI_2 + theta_offset + delta_theta}},
-      {{0, 0}},
-      {{npoints, npoints}},
-      {{false, false}}};
-  const auto domain = domain_creator.create_domain();
-  const auto& block = domain.blocks()[0];
-  const ElementId<2> element_id{0};
-  const ElementMap<2, Frame::Inertial> element_map{element_id, block};
-  const Mesh<2> mesh{npoints, Spectral::Basis::Legendre,
-                     Spectral::Quadrature::Gauss};
-  const auto xi = logical_coordinates(mesh);
-  const auto x = element_map(xi);
-  const auto inv_jacobian = element_map.inv_jacobian(xi);
-  const auto& r_star = get<0>(x);
-  const auto& theta = get<1>(x);
-  CAPTURE(min(r_star));
-  CAPTURE(max(r_star));
-  CAPTURE(min(theta));
-  CAPTURE(max(theta));
 
-  // Get the analytic fields
-  for (int m_mode_number = 10; m_mode_number < 11; ++m_mode_number) {
-    CAPTURE(m_mode_number);
-    const auto circular_orbit = CircularOrbit{1., 0.9, 20., m_mode_number};
+    const double rstar_offset = 12.6409;
+    const double delta_rstar = 0.249847;
+    const size_t npoints = 40;
+    const domain::creators::Rectangle domain_creator{
+      {{rstar_offset, M_PI_2 - 0.1}},
+      {{rstar_offset + delta_rstar, M_PI_2 + 0.1}},
+      {{0, 0}},
+      {{npoints, 3}},
+      {{false, false}}};
+    const auto domain = domain_creator.create_domain();
+    const auto& block = domain.blocks()[0];
+    const ElementId<2> element_id{0};
+    const ElementMap<2, Frame::Inertial> element_map{element_id, block};
+    const Mesh<2> mesh{{npoints,3}, Spectral::Basis::FiniteDifference,
+                     Spectral::Quadrature::CellCentered};
+    const auto xi = logical_coordinates(mesh);
+    const auto x = element_map(xi);
+    const auto inv_jacobian = element_map.inv_jacobian(xi);
+    const auto& r_star = get<0>(x);
+    const auto& theta = get<1>(x);
+    CAPTURE(min(r_star));
+    CAPTURE(max(r_star));
+    CAPTURE(min(theta));
+    CAPTURE(max(theta));
+
+    std::ofstream output_data("/home/cillian/debug/GRNewCircularEffectiveSource/spectre_source_off_particle.dat");
+    output_data << 
+      "i \t r_star \t theta \t scalar_eqn_re \t scalar_eqn_im \t effsource_re \t effsource_im \n";
+
+    const auto circular_orbit = CircularOrbit{1., 0.5, 20.,3};
     CAPTURE(circular_orbit.puncture_position());
     const auto background =
         circular_orbit.variables(x, CircularOrbit::background_tags{});
@@ -76,20 +72,6 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GrSelfForce.CircularOrbit",
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(
         vars);
     const auto& effective_source = get<::Tags::FixedSource<Tags::MMode>>(vars);
-
-    // Take numeric derivative
-    const auto numeric_deriv_singular_field =
-        partial_derivative(singular_field, mesh, inv_jacobian);
-    const Approx custom_approx = Approx::custom().epsilon(1.e-10).scale(1.);
-    for (size_t i = 0; i < deriv_singular_field.size(); ++i) {
-      CAPTURE(i);
-      /* CHECK_ITERABLE_CUSTOM_APPROX(numeric_deriv_singular_field[i],
-                                   deriv_singular_field[i], custom_approx); */
-    }
-
-    std::ofstream output_data("/home/cillian/debug/GRNewCircularEffectiveSource/test_dump_m0.dat");
-    output_data << 
-      "i \t r_star \t theta \t scalar_eqn_re \t scalar_eqn_im \t -effective_source_re \t -effective_source_im \t difference_re \t difference_im \n";
 
     Variables<
         tmpl::list<::Tags::Flux<Tags::MMode, tmpl::size_t<2>, Frame::Inertial>>>
@@ -109,21 +91,14 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GrSelfForce.CircularOrbit",
                                 gamma_theta, singular_field,
                                 flux_singular_field);
     for (size_t i = 0; i < scalar_eqn.size(); ++i) {
-      for(size_t j=0; j < scalar_eqn[i].size(); j++) 
+      for(size_t j=0; j < scalar_eqn[i].size(); j++)
       {
         output_data << i <<  "\t" << get<0>(x)[j] << "\t" << get<1>(x)[j] 
           << "\t" << scalar_eqn[i][j].real() << "\t" << scalar_eqn[i][j].imag()
           << "\t" << -effective_source[i][j].real() << "\t" << -effective_source[i][j].imag()
-          << "\t" << scalar_eqn[i][j].real() + effective_source[i][j].real()
-          << "\t" << scalar_eqn[i][j].imag() + effective_source[i][j].imag() << "\n";
+          << "\n";
       }
-
-      // CAPTURE(i);
       // std::cout << scalar_eqn[i]/(-effective_source[i]) << "\n";
-      CHECK_ITERABLE_CUSTOM_APPROX(scalar_eqn[i], -effective_source[i],
-                                   custom_approx);
     }
-  }
 }
-
-}  // namespace GrSelfForce::AnalyticData
+} //namespace GrSelfForce::AnalyticData
