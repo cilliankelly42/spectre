@@ -50,11 +50,11 @@ void transformation(
     // Construct the matrix in tetrad components to transform 
     std::array<std::complex<double>,dim*dim> tetrad_components = {
         std::complex<double>{Kinn_h_re[0], Kinn_h_im[0]},
-        std::complex<double>{Kinn_h_re[1], Kinn_h_im[1]}, 
+        std::complex<double>{Kinn_h_re[8], Kinn_h_im[8]}, 
         std::complex<double>{Kinn_h_re[2], Kinn_h_im[2]},
         std::complex<double>{Kinn_h_re[3], Kinn_h_im[3]},
 
-        std::complex<double>{Kinn_h_re[1], Kinn_h_im[1]},
+        std::complex<double>{Kinn_h_re[8], Kinn_h_im[8]},
         std::complex<double>{Kinn_h_re[4], Kinn_h_im[4]},
         std::complex<double>{Kinn_h_re[5], Kinn_h_im[5]},
         std::complex<double>{Kinn_h_re[6], Kinn_h_im[6]},
@@ -62,11 +62,11 @@ void transformation(
         std::complex<double>{Kinn_h_re[2], Kinn_h_im[2]},
         std::complex<double>{Kinn_h_re[5], Kinn_h_im[5]},
         std::complex<double>{Kinn_h_re[7], Kinn_h_im[7]},
-        std::complex<double>{Kinn_h_re[8], Kinn_h_im[8]},
+        std::complex<double>{Kinn_h_re[1], Kinn_h_im[1]},
 
         std::complex<double>{Kinn_h_re[3], Kinn_h_im[3]},
         std::complex<double>{Kinn_h_re[6], Kinn_h_im[6]},
-        std::complex<double>{Kinn_h_re[8], Kinn_h_im[8]},
+        std::complex<double>{Kinn_h_re[1], Kinn_h_im[1]},
         std::complex<double>{Kinn_h_re[9], Kinn_h_im[9]},
     };
 
@@ -242,11 +242,11 @@ void transformation(
     // Construct dh_dX matrix (derivatives of tetrad copmonents of h wrt X)
     std::array<std::complex<double>,dim*dim> dh_dX_matrix = {
         std::complex<double>{dh_dX_re[0], dh_dX_im[0]},
-        std::complex<double>{dh_dX_re[1], dh_dX_im[1]}, 
+        std::complex<double>{dh_dX_re[8], dh_dX_im[8]}, 
         std::complex<double>{dh_dX_re[2], dh_dX_im[2]},
         std::complex<double>{dh_dX_re[3], dh_dX_im[3]},
 
-        std::complex<double>{dh_dX_re[1], dh_dX_im[1]},
+        std::complex<double>{dh_dX_re[8], dh_dX_im[8]},
         std::complex<double>{dh_dX_re[4], dh_dX_im[4]},
         std::complex<double>{dh_dX_re[5], dh_dX_im[5]},
         std::complex<double>{dh_dX_re[6], dh_dX_im[6]},
@@ -254,22 +254,22 @@ void transformation(
         std::complex<double>{dh_dX_re[2], dh_dX_im[2]},
         std::complex<double>{dh_dX_re[5], dh_dX_im[5]},
         std::complex<double>{dh_dX_re[7], dh_dX_im[7]},
-        std::complex<double>{dh_dX_re[8], dh_dX_im[8]},
+        std::complex<double>{dh_dX_re[1], dh_dX_im[1]},
 
         std::complex<double>{dh_dX_re[3], dh_dX_im[3]},
         std::complex<double>{dh_dX_re[6], dh_dX_im[6]},
-        std::complex<double>{dh_dX_re[8], dh_dX_im[8]},
+        std::complex<double>{dh_dX_re[1], dh_dX_im[1]},
         std::complex<double>{dh_dX_re[9], dh_dX_im[9]},
     };
 
     //Construct dh_dY matrix (derivatives of tetrad components of h wrt Y)
     std::array<std::complex<double>,dim*dim> dh_dY_matrix = {
         std::complex<double>{dh_dY_re[0], dh_dY_im[0]},
-        std::complex<double>{dh_dY_re[1], dh_dY_im[1]}, 
+        std::complex<double>{dh_dY_re[8], dh_dY_im[8]}, 
         std::complex<double>{dh_dY_re[2], dh_dY_im[2]},
         std::complex<double>{dh_dY_re[3], dh_dY_im[3]},
 
-        std::complex<double>{dh_dY_re[1], dh_dY_im[1]},
+        std::complex<double>{dh_dY_re[8], dh_dY_im[8]},
         std::complex<double>{dh_dY_re[4], dh_dY_im[4]},
         std::complex<double>{dh_dY_re[5], dh_dY_im[5]},
         std::complex<double>{dh_dY_re[6], dh_dY_im[6]},
@@ -277,11 +277,11 @@ void transformation(
         std::complex<double>{dh_dY_re[2], dh_dY_im[2]},
         std::complex<double>{dh_dY_re[5], dh_dY_im[5]},
         std::complex<double>{dh_dY_re[7], dh_dY_im[7]},
-        std::complex<double>{dh_dY_re[8], dh_dY_im[8]},
+        std::complex<double>{dh_dY_re[1], dh_dY_im[1]},
 
         std::complex<double>{dh_dY_re[3], dh_dY_im[3]},
         std::complex<double>{dh_dY_re[6], dh_dY_im[6]},
-        std::complex<double>{dh_dY_re[8], dh_dY_im[8]},
+        std::complex<double>{dh_dY_re[1], dh_dY_im[1]},
         std::complex<double>{dh_dY_re[9], dh_dY_im[9]},
     };
 

@@ -6,8 +6,6 @@
 #include <array>
 #include <complex>
 #include <cstddef>
-#include <iostream>
-#include <fstream>
 
 #include "DataStructures/DataVector.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
@@ -60,7 +58,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GrSelfForce.CircularOrbit",
   CAPTURE(max(theta));
 
   // Get the analytic fields
-  for (int m_mode_number = 10; m_mode_number < 11; ++m_mode_number) {
+  for (int m_mode_number = 0; m_mode_number < 3; ++m_mode_number) {
     CAPTURE(m_mode_number);
     const auto circular_orbit = CircularOrbit{1., 0.9, 20., m_mode_number};
     CAPTURE(circular_orbit.puncture_position());
@@ -83,13 +81,9 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GrSelfForce.CircularOrbit",
     const Approx custom_approx = Approx::custom().epsilon(1.e-10).scale(1.);
     for (size_t i = 0; i < deriv_singular_field.size(); ++i) {
       CAPTURE(i);
-      /* CHECK_ITERABLE_CUSTOM_APPROX(numeric_deriv_singular_field[i],
-                                   deriv_singular_field[i], custom_approx); */
+      CHECK_ITERABLE_CUSTOM_APPROX(numeric_deriv_singular_field[i],
+                                   deriv_singular_field[i], custom_approx);
     }
-
-    std::ofstream output_data("/home/cillian/debug/GRNewCircularEffectiveSource/test_dump_m0.dat");
-    output_data << 
-      "i \t r_star \t theta \t scalar_eqn_re \t scalar_eqn_im \t -effective_source_re \t -effective_source_im \t difference_re \t difference_im \n";
 
     Variables<
         tmpl::list<::Tags::Flux<Tags::MMode, tmpl::size_t<2>, Frame::Inertial>>>
@@ -109,17 +103,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.GrSelfForce.CircularOrbit",
                                 gamma_theta, singular_field,
                                 flux_singular_field);
     for (size_t i = 0; i < scalar_eqn.size(); ++i) {
-      for(size_t j=0; j < scalar_eqn[i].size(); j++) 
-      {
-        output_data << i <<  "\t" << get<0>(x)[j] << "\t" << get<1>(x)[j] 
-          << "\t" << scalar_eqn[i][j].real() << "\t" << scalar_eqn[i][j].imag()
-          << "\t" << -effective_source[i][j].real() << "\t" << -effective_source[i][j].imag()
-          << "\t" << scalar_eqn[i][j].real() + effective_source[i][j].real()
-          << "\t" << scalar_eqn[i][j].imag() + effective_source[i][j].imag() << "\n";
-      }
-
       // CAPTURE(i);
-      // std::cout << scalar_eqn[i]/(-effective_source[i]) << "\n";
       CHECK_ITERABLE_CUSTOM_APPROX(scalar_eqn[i], -effective_source[i],
                                    custom_approx);
     }

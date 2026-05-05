@@ -621,9 +621,6 @@ void effsource_calc_m(int m, struct coordinate * x, double *hS_re, double *hS_im
   const double hS_im_tetrad[10] = {
     hllI, hlnI, hlmI, hlmbI, hnnI, hnmI, hnmbI, hmmI, hmmbI, hmbmbI
   };
-  printf(
-      "Tetrad puncture is:\n %f \n %f \n %f \n %f \n %f\n %f \n %f\n %f\n %f\n %f \n Done \n",
-      hllR, hlnR, hlmR, hlmbR, hnnR, hnmR, hnmbR, hmmR, hmmbR, hmbmbR);
 
   /* hS_re_tetrad[0] = hll_re;
   hS_re_tetrad[1] = hnn_re;
@@ -3321,10 +3318,6 @@ void effsource_calc_m(int m, struct coordinate * x, double *hS_re, double *hS_im
     Em_llR, Em_lnR, Em_lmR, Em_lmbR, Em_nnR, Em_nmR, Em_nmbR, Em_mmR, Em_mmbR, Em_mbmbR};
   const double Em_im_tetrad[10]= {
     Em_llI, Em_lnI, Em_lmI, Em_lmbI, Em_nnI, Em_nmI, Em_nmbI, Em_mmI, Em_mmbI, Em_mbmbI};
-
-  /* printf(
-      "Tetrad source is:\n %f \n %f \n %f \n %f \n %f\n %f \n %f\n %f\n %f\n %f \n Done \n",
-      Em_llR, Em_lnR, Em_lmR, Em_lmbR, Em_nnR, Em_nmR, Em_nmbR, Em_mmR, Em_mmbR, Em_mbmbR); */
 
   //Transform field, derivatives and effective source to BoyerLindquist 
   transformation(hS_re_tetrad, hS_im_tetrad, dh_dX_re, dh_dX_im, dh_dY_re, dh_dY_im,

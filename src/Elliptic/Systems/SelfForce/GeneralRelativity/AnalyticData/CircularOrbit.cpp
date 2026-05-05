@@ -243,20 +243,12 @@ CircularOrbit::variables(
       x_i.t = 0;
       x_i.r = r[i];
       x_i.theta = theta[i];
-      std::cout << "r value: " << "\t" << x_i.r << "\t" 
-        << "theta_value: " << "\t" << x_i.theta << "\n";
       x_i.phi = 0;
       effsource_calc_m(m_mode_number_, &x_i, hS_re.data(), hS_im.data(),
                        dhS_dr_re.data(), dhS_dr_im.data(), dhS_dth_re.data(),
                        dhS_dth_im.data(), dhS_dph_re.data(), dhS_dph_im.data(),
                        dhS_dt_re.data(), dhS_dt_im.data(), src_re.data(),
                        src_im.data());
-      /* std::cout << "Transformed source: \n";
-      for(auto&value:src_re)
-      {
-          std::cout <<  value << "\n";
-      }
-      std::cout << "\n\n"; */
       detail::convert_effsource_psi(m_mode_number_, a, r[i], theta[i], hS_re,
                                     hS_im, hS_conv_re, hS_conv_im);
       detail::convert_effsource_dpsidtheta(m_mode_number_, a, r[i], theta[i],

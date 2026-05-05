@@ -5,7 +5,6 @@ set(LIBRARY "Test_GrSelfForceAnalyticData")
 
 set(LIBRARY_SOURCES
   Test_CircularOrbit.cpp
-  #Test_Effsource.cpp
   )
 
 add_test_library(${LIBRARY} "${LIBRARY_SOURCES}")
