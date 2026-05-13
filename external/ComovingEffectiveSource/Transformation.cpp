@@ -47,7 +47,7 @@ void transformation(
         std::complex<double>{(a*(a*a + r*r)*cos(theta)*sin(theta))/(sqrt(2)*(r*r + a*a*cos(theta)*cos(theta))), ((r*(a*a + r*r)*sin(theta))/(sqrt(2)*(r*r + a*a*cos(theta)*cos(theta))))}
     };
 
-    // Construct the matrix in tetrad components to transform 
+    // Construct the trace reversed matrix in tetrad components to transform 
     std::array<std::complex<double>,dim*dim> tetrad_components = {
         std::complex<double>{Kinn_h_re[0], Kinn_h_im[0]},
         std::complex<double>{Kinn_h_re[8], Kinn_h_im[8]}, 
@@ -239,7 +239,7 @@ void transformation(
         std::complex<double>{(a*(a*a + r*r)*(a*a + (a*a + 2*r*r)*cos(2*theta)))/(2*sqrt(2)*Sigma_sq), -(r*(a*a + r*r)*cos(theta)*(-3*a*a - 2*r*r + a*a*cos(2*theta)))/(2*sqrt(2)*Sigma_sq)},
     };
 
-    // Construct dh_dX matrix (derivatives of tetrad copmonents of h wrt X)
+    // Construct the trace reversed dh_dX matrix (derivatives of tetrad copmonents of h wrt X)
     std::array<std::complex<double>,dim*dim> dh_dX_matrix = {
         std::complex<double>{dh_dX_re[0], dh_dX_im[0]},
         std::complex<double>{dh_dX_re[8], dh_dX_im[8]}, 
@@ -262,7 +262,7 @@ void transformation(
         std::complex<double>{dh_dX_re[9], dh_dX_im[9]},
     };
 
-    //Construct dh_dY matrix (derivatives of tetrad components of h wrt Y)
+    //Construct the trace reversed dh_dY matrix (derivatives of tetrad components of h wrt Y)
     std::array<std::complex<double>,dim*dim> dh_dY_matrix = {
         std::complex<double>{dh_dY_re[0], dh_dY_im[0]},
         std::complex<double>{dh_dY_re[8], dh_dY_im[8]}, 
