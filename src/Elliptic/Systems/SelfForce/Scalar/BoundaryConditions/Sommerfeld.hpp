@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -47,14 +48,29 @@ class Sommerfeld : public elliptic::BoundaryConditions::BoundaryCondition<2> {
         "Kerr dimensionless spin parameter 'chi' of the black hole";
     using type = double;
   };
-  struct OrbitalRadius {
+  /* struct OrbitalRadius {
     static constexpr Options::String help =
         "Radius 'r_0' of the circular orbit";
+    using type = double;
+  }; */
+  struct SemiLatusRectum {
+    static constexpr Options::String help =
+      "Semi latus rectum p of the eccentric orbit";
+    using type = double;
+  };
+  struct Eccentricity {
+    static constexpr Options::String help = 
+      "Eccentricity e of the eccentric orbit";
     using type = double;
   };
   struct MModeNumber {
     static constexpr Options::String help =
         "Mode number 'm' of the scalar field";
+    using type = int;
+  };
+  struct NModeNumber {
+    static constexpr Options::String help = 
+      "Mode number 'n' of the scalar field";
     using type = int;
   };
   struct HyperboloidalSlicing {
@@ -73,8 +89,11 @@ class Sommerfeld : public elliptic::BoundaryConditions::BoundaryCondition<2> {
 
   static constexpr Options::String help =
       "Radial Sommerfeld boundary condition";
-  using options = tmpl::list<BlackHoleMass, BlackHoleSpin, OrbitalRadius,
-                             MModeNumber, HyperboloidalSlicing, Order>;
+  using options = tmpl::list<
+    BlackHoleMass, BlackHoleSpin, 
+    // OrbitalRadius,
+    SemiLatusRectum, Eccentricity,
+    MModeNumber, NModeNumber, HyperboloidalSlicing, Order>;
 
   Sommerfeld() = default;
   Sommerfeld(const Sommerfeld&) = default;
@@ -84,13 +103,20 @@ class Sommerfeld : public elliptic::BoundaryConditions::BoundaryCondition<2> {
   ~Sommerfeld() override = default;
 
   explicit Sommerfeld(double black_hole_mass, double black_hole_spin,
-                      double orbital_radius, int m_mode_number,
+                      // double orbital_radius, 
+                      double semi_latus_rectum,
+                      double eccentricity,
+                      int m_mode_number, 
+                      int n_mode_number,
                       bool hyperboloidal_slicing, int order);
 
   double black_hole_mass() const { return black_hole_mass_; }
   double black_hole_spin() const { return black_hole_spin_; }
-  double orbital_radius() const { return orbital_radius_; }
+  // double orbital_radius() const { return orbital_radius_; }
+  double semi_latus_rectum() const { return semi_latus_rectum_; }
+  double eccentricity() const { return eccentricity_; }
   int m_mode_number() const { return m_mode_number_; }
+  int n_mode_number() const { return n_mode_number_; }
   bool hyperboloidal_slicing() const { return hyperboloidal_slicing_; }
 
   /// \cond
@@ -139,8 +165,11 @@ class Sommerfeld : public elliptic::BoundaryConditions::BoundaryCondition<2> {
 
   double black_hole_mass_{std::numeric_limits<double>::signaling_NaN()};
   double black_hole_spin_{std::numeric_limits<double>::signaling_NaN()};
-  double orbital_radius_{std::numeric_limits<double>::signaling_NaN()};
+  // double orbital_radius_{std::numeric_limits<double>::signaling_NaN()};
+  double semi_latus_rectum_{std::numeric_limits<double>::signaling_NaN()};
+  double eccentricity_{std::numeric_limits<double>::signaling_NaN()};
   int m_mode_number_{};
+  int n_mode_number_{};
   bool hyperboloidal_slicing_{};
   int order_{};
 };

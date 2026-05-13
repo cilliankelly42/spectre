@@ -5,6 +5,7 @@
 
 #include "DataStructures/DataBox/Tag.hpp"
 #include "DataStructures/Tensor/TypeAliases.hpp"
+#include <vector>
 
 /// \cond
 class ComplexDataVector;

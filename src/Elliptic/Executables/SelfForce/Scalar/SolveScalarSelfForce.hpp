@@ -45,6 +45,8 @@
 #include "ParallelAlgorithms/LinearSolver/Multigrid/ElementsAllocator.hpp"
 #include "ParallelAlgorithms/LinearSolver/Multigrid/Tags.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/CircularOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/AnalyticSolution.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/Background.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/InitialGuess.hpp"
@@ -87,9 +89,15 @@ struct Metavariables {
                    tmpl::list<domain::creators::Rectangle,
                               domain::creators::AlignedLattice<2>>>,
         tmpl::pair<elliptic::analytic_data::Background,
-                   tmpl::list<ScalarSelfForce::AnalyticData::CircularOrbit>>,
+                   tmpl::list<
+                   ScalarSelfForce::AnalyticData::CircularOrbit,
+                   ScalarSelfForce::AnalyticData::EccentricOrbit>
+                       >,
         tmpl::pair<elliptic::analytic_data::InitialGuess,
-                   tmpl::list<ScalarSelfForce::AnalyticData::CircularOrbit>>,
+                   tmpl::list<
+                   ScalarSelfForce::AnalyticData::CircularOrbit,
+                   ScalarSelfForce::AnalyticData::EccentricOrbit>
+                       >,
         tmpl::pair<elliptic::analytic_data::AnalyticSolution, tmpl::list<>>,
         tmpl::pair<elliptic::BoundaryConditions::BoundaryCondition<volume_dim>,
                    tmpl::list<ScalarSelfForce::BoundaryConditions::Angular,

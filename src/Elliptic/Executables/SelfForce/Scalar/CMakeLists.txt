@@ -13,6 +13,7 @@ target_link_libraries(
   ${EXECUTABLE}
   PRIVATE
   AmrCriteria
+  Charmxx::charmxx
   Charmxx::main
   Convergence
   CoordinateMaps

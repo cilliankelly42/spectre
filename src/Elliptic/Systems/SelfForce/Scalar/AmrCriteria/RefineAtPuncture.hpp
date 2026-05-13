@@ -17,6 +17,7 @@
 #include "Parallel/GlobalCache.hpp"
 #include "ParallelAlgorithms/Amr/Criteria/Criterion.hpp"
 #include "ParallelAlgorithms/Amr/Criteria/Type.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/Background.hpp"
 #include "Utilities/Serialization/CharmPupable.hpp"
 #include "Utilities/TMPL.hpp"
@@ -55,7 +56,7 @@ class RefineAtPuncture : public amr::Criterion {
 
   template <typename Metavariables>
   std::array<amr::Flag, 2> operator()(
-      const elliptic::analytic_data::Background& background,
+        const elliptic::analytic_data::Background& background,
       const Domain<2>& domain, Parallel::GlobalCache<Metavariables>& /*cache*/,
       const ElementId<2>& element_id) const {
     return impl(background, domain, element_id);

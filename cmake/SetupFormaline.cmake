@@ -13,6 +13,7 @@ set(SPECTRE_FORMALINE_LOCATIONS
   .dockerignore
   .github
   .gitignore
+  BuildInfo.txt
   citation.bib
   CITATION.cff
   cmake
@@ -24,6 +25,7 @@ set(SPECTRE_FORMALINE_LOCATIONS
   Metadata.yaml
   pyproject.toml
   README.md
+  runs
   setup.cfg
   src
   support
