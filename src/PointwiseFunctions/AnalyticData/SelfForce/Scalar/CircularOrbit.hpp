@@ -196,6 +196,10 @@ class CircularOrbit : public SelfForceBackground,
   tnsr::I<double, 2> puncture_position() const override;
   double black_hole_mass() const override { return black_hole_mass_; }
   double black_hole_spin() const override { return black_hole_spin_; }
+  // Have to override semi_latus_rectum and eccentricity because they are 
+  // pure virtual in the base class SelfForceBackground
+  double semi_latus_rectum() const override { return semi_latus_rectum_; }
+  double eccentricity() const override { return eccentricity_; }
   double orbital_radius() const override { return orbital_radius_; }
   int m_mode_number() const override { return m_mode_number_; }
   std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions()
@@ -243,6 +247,8 @@ class CircularOrbit : public SelfForceBackground,
 
   double black_hole_mass_{std::numeric_limits<double>::signaling_NaN()};
   double black_hole_spin_{std::numeric_limits<double>::signaling_NaN()};
+  double semi_latus_rectum_{std::numeric_limits<double>::signaling_NaN()};
+  double eccentricity_{std::numeric_limits<double>::signaling_NaN()};
   double orbital_radius_{std::numeric_limits<double>::signaling_NaN()};
   int m_mode_number_{};
   std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions_{};

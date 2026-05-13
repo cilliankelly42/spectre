@@ -25,41 +25,42 @@
 namespace ScalarSelfForce::AmrCriteria {
 
 std::array<amr::Flag, 2> RefineAtPuncture::impl(
-    const ScalarSelfForce::AnalyticData::SelfForceBackground& background,
+    const elliptic::analytic_data::Background& background,
     const Domain<2>& domain, const ElementId<2>& element_id) {
-    /* const auto puncture_position =
-        dynamic_cast<const ScalarSelfForce::AnalyticData::CircularOrbit&>(
-            background)
-            .puncture_position(); */
 
-    //Just use background here.. No dynamic cast, then setup a self force 
-    //version of the elliptic background class where you define virtual 
-    //functions for all of the functions in each class. 
+    const auto& orbit = dynamic_cast<const ScalarSelfForce::AnalyticData::SelfForceBackground&>
+        (background);
 
-    const auto& eccentric_orbit = background;
-
-    // const auto puncture_position = eccentric_orbit.puncture_position();
-
-    /* const auto puncture_position =
-        dynamic_cast<const ScalarSelfForce::AnalyticData::EccentricOrbit&>(
-            background)
-            .puncture_position(); */
-
+    //Create a bounding box to represent the particle 
     using point = boost::geometry::model::d2::point_xy<double>;
     using box = boost::geometry::model::box<point>; 
-    const double M = eccentric_orbit.black_hole_mass();
-    const double r_plus = M * (1. + sqrt(1. - square(eccentric_orbit.black_hole_spin())));
-    const double r_min = eccentric_orbit.semi_latus_rectum()/(1 + eccentric_orbit.eccentricity());
-    const double r_max = eccentric_orbit.semi_latus_rectum()/(1 - eccentric_orbit.eccentricity());
-    const double r_star_min = 
+    const double M = orbit.black_hole_mass();
+    const double r_plus = M * (1. + sqrt(1. - square(orbit.black_hole_spin())));
+    double r_min = 0;
+    double r_max = 0;
+    double r_star_min = get<0>(orbit.puncture_position());
+    double r_star_max = get<0>(orbit.puncture_position());
+    // If the orbit is eccentric, need to create a line
+    if(dynamic_cast<const ScalarSelfForce::AnalyticData::EccentricOrbit*>(&orbit))
+    {
+        r_min = orbit.semi_latus_rectum()/(1 + orbit.eccentricity());
+        r_max = orbit.semi_latus_rectum()/(1 - orbit.eccentricity());
+        r_star_min = 
+            gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
+                r_min - r_plus, M, orbit.black_hole_spin());
+        r_star_max = 
+            gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
+              r_max - r_plus, M, orbit.black_hole_spin());
+    }
+    /* const double r_star_min = 
     gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
         r_min - r_plus, M, eccentric_orbit.black_hole_spin());
     const double r_star_max = 
     gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
-      r_max - r_plus, M, eccentric_orbit.black_hole_spin());
+      r_max - r_plus, M, eccentric_orbit.black_hole_spin()); */
 
+    // Create a bounding box to represent the particle
     box puncture_box{{r_star_min, 0}, {r_star_max,0}};
-    //Make the puncture box here
 
     // Check if the block contains the puncture box
     const auto& block = domain.blocks()[element_id.block_id()];

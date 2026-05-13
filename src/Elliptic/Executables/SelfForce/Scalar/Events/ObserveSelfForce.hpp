@@ -40,9 +40,12 @@
 #include "ParallelAlgorithms/EventsAndTriggers/Event.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/CircularOrbit.hpp"
 #include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
+#include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
 #include "Utilities/ErrorHandling/Assert.hpp"
 #include "Utilities/ErrorHandling/Error.hpp"
 #include "Utilities/Functional.hpp"
+#include "Utilities/Gsl.hpp"
 #include "Utilities/OptionalHelpers.hpp"
 #include "Utilities/PrettyType.hpp"
 #include "Utilities/Serialization/CharmPupable.hpp"
@@ -105,12 +108,18 @@ class ObserveSelfForce : public Event {
       return;
     }
     const auto& background = get<BackgroundTag>(box);
-    /* const auto& circular_orbit =
-        dynamic_cast<const AnalyticData::CircularOrbit&>(background); */
-    const auto& eccentric_orbit = background;
+    const auto& orbit =
+        dynamic_cast<const ScalarSelfForce::AnalyticData::SelfForceBackground&>(background);
     // Get element-logical coords of puncture
     const auto& domain = get<domain::Tags::Domain<2>>(box);
-    const auto puncture_position = eccentric_orbit.puncture_position();
+    const auto puncture_position = orbit.puncture_position();
+    /* const double M = orbit.black_hole_mass();
+    const double spin = orbit.black_hole_spin();
+    const double r_plus = M * (1. + sqrt(1. - square(spin)));
+    const double radius = 22;
+    const double r_star_to_comp = gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
+      radius - r_plus, M, spin);
+    const auto puncture_position = tnsr::I<double, 2>{{{r_star_to_comp, 0.}}}; */
     const auto& block = domain.blocks()[element_id.block_id()];
     const auto block_logical_coords =
         block_logical_coordinates_single_point(puncture_position, block);
@@ -123,8 +132,10 @@ class ObserveSelfForce : public Event {
       return;
     }
 
-    // Interpolate field and field derivative to puncture position
+    // Interpolate field and field derivative to puncture position. Also do
+    // singular field for comparison with BHPToolkit
     const auto& field = get<Tags::MMode>(box);
+    const auto& sing_field = get<ScalarSelfForce::Tags::SingularField>(box);
     const auto& mesh = get<domain::Tags::Mesh<2>>(box);
     const auto& inv_jacobian =
         get<domain::Tags::InverseJacobian<2, Frame::ElementLogical,
@@ -136,6 +147,9 @@ class ObserveSelfForce : public Event {
     Scalar<std::complex<double>> field_at_puncture{};
     interpolator.interpolate(make_not_null(&intrp_result), get(field));
     get(field_at_puncture) = intrp_result[0];
+    Scalar<std::complex<double>> sing_field_at_puncture{};
+    interpolator.interpolate(make_not_null(&intrp_result), get(sing_field));
+    get(sing_field_at_puncture) = intrp_result[0];
     tnsr::i<std::complex<double>, 2> deriv_field_at_puncture{};
     interpolator.interpolate(make_not_null(&intrp_result), get<0>(deriv_field));
     get<0>(deriv_field_at_puncture) = intrp_result[0];
@@ -143,12 +157,19 @@ class ObserveSelfForce : public Event {
     get<1>(deriv_field_at_puncture) = 0.;
     // Calculate self-force in r and theta coordinates
     tnsr::i<std::complex<double>, 2> self_force = deriv_field_at_puncture;
-    const double r0 = eccentric_orbit.semi_latus_rectum();
-    // const double r0 = circular_orbit.orbital_radius();
-    const double M = eccentric_orbit.black_hole_mass();
-    const double spin = eccentric_orbit.black_hole_spin();
+    double r0;
+    if(dynamic_cast<const ScalarSelfForce::AnalyticData::EccentricOrbit*>(&orbit))
+    {
+      r0 = orbit.semi_latus_rectum();
+    }
+    if(dynamic_cast<const ScalarSelfForce::AnalyticData::CircularOrbit*>(&orbit))
+    {
+      r0 = orbit.orbital_radius();
+    }
+    const double M = orbit.black_hole_mass();
+    const double spin = orbit.black_hole_spin();
     const double a = M * spin;
-    const int m_mode = eccentric_orbit.m_mode_number();
+    const int m_mode = orbit.m_mode_number();
     const double r_plus = M * (1. + sqrt(1. - square(spin)));
     const double r_minus = M * (1. - sqrt(1. - square(spin)));
     const double alpha = 1. - 2. * M * r0 / (square(r0) + square(a));
@@ -176,6 +197,7 @@ class ObserveSelfForce : public Event {
         reduction_writer[0], std::string{"/SelfForce"},
         std::vector<std::string>{"IterationId", "Re(RegularFieldAtPuncture)",
                                  "Im(RegularFieldAtPuncture)",
+                                 "Re(SingularField)","Im(SingularField)",
                                  "Re(DerivRegularFieldAtPuncture_rstar)",
                                  "Im(DerivRegularFieldAtPuncture_rstar)",
                                  "Re(DerivRegularFieldAtPuncture_costheta)",
@@ -184,6 +206,8 @@ class ObserveSelfForce : public Event {
                                  "Re(SelfForce_theta)", "Im(SelfForce_theta)"},
         std::make_tuple(observation_value.value, get(field_at_puncture).real(),
                         get(field_at_puncture).imag(),
+                        get(sing_field_at_puncture).real(), 
+                        get(sing_field_at_puncture).imag(),
                         get<0>(deriv_field_at_puncture).real(),
                         get<0>(deriv_field_at_puncture).imag(),
                         get<1>(deriv_field_at_puncture).real(),

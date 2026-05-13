@@ -122,6 +122,7 @@ class EccentricOrbit : public SelfForceBackground,
   double black_hole_spin() const override { return black_hole_spin_; }
   double semi_latus_rectum() const override { return semi_latus_rectum_; }
   double eccentricity() const override { return eccentricity_; }
+  double orbital_radius() const override { return orbital_radius_; }
   int m_mode_number() const override { return m_mode_number_; }
   int n_mode_number() const { return n_mode_number_ ; }
   size_t time_points() const { return time_points_; }
@@ -198,6 +199,7 @@ class EccentricOrbit : public SelfForceBackground,
   double black_hole_spin_{std::numeric_limits<double>::signaling_NaN()};
   double semi_latus_rectum_{std::numeric_limits<double>::signaling_NaN()};
   double eccentricity_{std::numeric_limits<double>::signaling_NaN()};
+  double orbital_radius_{std::numeric_limits<double>::signaling_NaN()};
   int m_mode_number_{};
   int n_mode_number_{};
   std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions_{};

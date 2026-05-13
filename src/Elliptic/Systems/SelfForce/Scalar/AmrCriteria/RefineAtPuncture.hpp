@@ -56,7 +56,7 @@ class RefineAtPuncture : public amr::Criterion {
 
   template <typename Metavariables>
   std::array<amr::Flag, 2> operator()(
-        const ScalarSelfForce::AnalyticData::SelfForceBackground& background,
+        const elliptic::analytic_data::Background& background,
       const Domain<2>& domain, Parallel::GlobalCache<Metavariables>& /*cache*/,
       const ElementId<2>& element_id) const {
     return impl(background, domain, element_id);
@@ -64,7 +64,7 @@ class RefineAtPuncture : public amr::Criterion {
 
  private:
   static std::array<amr::Flag, 2> impl(
-      const ScalarSelfForce::AnalyticData::SelfForceBackground& background,
+      const elliptic::analytic_data::Background& background,
       const Domain<2>& domain, const ElementId<2>& element_id);
 };
 

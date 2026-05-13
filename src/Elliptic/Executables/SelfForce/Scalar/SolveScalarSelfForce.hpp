@@ -88,7 +88,7 @@ struct Metavariables {
         tmpl::pair<DomainCreator<volume_dim>,
                    tmpl::list<domain::creators::Rectangle,
                               domain::creators::AlignedLattice<2>>>,
-        tmpl::pair<ScalarSelfForce::AnalyticData::SelfForceBackground,
+        tmpl::pair<elliptic::analytic_data::Background,
                    tmpl::list<
                    ScalarSelfForce::AnalyticData::CircularOrbit,
                    ScalarSelfForce::AnalyticData::EccentricOrbit>

@@ -623,13 +623,13 @@ EccentricOrbit::variables(
   }
 
   // only compute the n_modes of the singular field and its derivatives when 
-  // crossing the worldtube
+  // crossing the worldtube because that's where they are needed
+  
   if(on_worldtube_boundary){
-    get(singular_field) =
-      compute_n_mode(singular_field_evolution, num_points, 1e-10);
-
     deriv_singular_field =
       compute_n_mode(deriv_singular_field_evolution, num_points, 1e-10);
+    get(singular_field) =
+      compute_n_mode(singular_field_evolution, num_points, 1e-10);
   }
 
   get(effective_source) =
