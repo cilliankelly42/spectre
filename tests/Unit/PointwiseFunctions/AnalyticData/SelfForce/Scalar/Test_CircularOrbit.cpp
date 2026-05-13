@@ -70,7 +70,8 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.CircularOrbit",
     const auto& alpha = get<Tags::Alpha>(background);
     const auto& beta = get<Tags::Beta>(background);
     const auto& gamma = get<Tags::Gamma>(background);
-    const auto vars = circular_orbit.variables(x, CircularOrbit::source_tags{});
+    const auto vars = circular_orbit.variables(
+        x, true, CircularOrbit::source_tags{});
     const auto& singular_field = get<Tags::SingularField>(vars);
     const auto& deriv_singular_field = get<
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(

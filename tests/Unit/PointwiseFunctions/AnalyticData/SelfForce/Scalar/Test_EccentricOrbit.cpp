@@ -35,10 +35,10 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   // the puncture.
 
   // Set up a domain
-  const double costheta_offset = -0.001;
-  const double delta_costheta = 0.0003;
-  const double rstar_offset = 10.;
-  const double delta_rstar = 0.1;
+  const double costheta_offset = 0.1;
+  const double delta_costheta = 0.2;
+  const double rstar_offset = 0.;
+  const double delta_rstar = 5.;
   const size_t npoints = 20;
   const domain::creators::Rectangle domain_creator{
       {{rstar_offset, costheta_offset}},
@@ -63,7 +63,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   CAPTURE(max(cos_theta));
 
   // Get the analytic fields
-  for (int n_mode_number = 0; n_mode_number < 1; ++n_mode_number) {
+  for (int n_mode_number = 0; n_mode_number < 3; ++n_mode_number) {
 
     CAPTURE(n_mode_number);
     const auto eccentric_orbit = EccentricOrbit{
@@ -75,7 +75,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
     const auto& beta = get<Tags::Beta>(background);
     const auto& gamma = get<Tags::Gamma>(background);
     const auto vars = eccentric_orbit.variables(
-        x, true,EccentricOrbit::source_tags{});
+        x, true, EccentricOrbit::source_tags{});
     const auto& singular_field = get<Tags::SingularField>(vars);
     const auto& deriv_singular_field = get<
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(
