@@ -33,10 +33,9 @@ extern "C" {
 #include <cmath>
 #include <complex>
 #include <cstddef>
-#include <effsource.hpp>
+#include <effsource_equatorial.hpp>
 #include <gsl/gsl_errno.h>
 #include <iostream>
-#include <mutex>
 #include <utility>
 
 #include "DataStructures/Blaze/IntegerPow.hpp"
@@ -407,7 +406,7 @@ EccentricOrbit::variables(
         Tags::BoyerLindquistRadius> /*meta*/) const {
   const double a = black_hole_spin_ * black_hole_mass_;
   const double M = black_hole_mass_;
-  const double r_0 = semi_latus_rectum_;  // Set to rmin/rmax
+  // const double r_0 = semi_latus_rectum_;  // Set to rmin/rmax
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
   const double r_minus = M * (1. - sqrt(1. - square(black_hole_spin_)));
 
@@ -510,16 +509,13 @@ EccentricOrbit::variables(
   }
 
   {
-    std::lock_guard<std::mutex> lock(*effsource_mutex);
     // Call into effsource
     coordinate x_i{};
     std::array<double, 2> PhiS{};
     std::array<double, 8> dPhiS_dx{};
     std::array<double, 20> d2PhiS_dx2{};
     std::array<double, 2> src{};
-    std::array<double, 2> src1{};
-    std::array<double, 2> src2{};
-    effsource_init(M, a);
+    struct effsource_equatorial_ctx * ctx = effsource_equatorial_create(M, a);
 
     for (size_t i = 0; i < t_values.size(); i++) {
       // Initialize effsource
@@ -529,31 +525,14 @@ EccentricOrbit::variables(
       xp.theta = M_PI_2;
       xp.phi = phi_of_t[i];
       x_i.t = t_values[i];
-      effsource_set_particle(&xp, energy, angular_momentum, u_r[i]);
+      effsource_equatorial_ctx_set_particle(ctx, &xp, energy, angular_momentum, u_r[i]);
 
       for (size_t j = 0; j < num_points; j++) {
         x_i.r = r[j];
         x_i.theta = acos(cos_theta[j]);
         x_i.phi = 0;
-        if(
-          (rmin - 1e-3 < r[j] && r[j] < rmax + 1e-3)
-          &&
-          (-1e-8 < get<1>(x)[j] && get<1>(x)[j] < 1e-8))
-        {
-          std::cout << "In the special case \n";
-          x_i.theta = M_PI_2 - 1e-2;
-          effsource_calc_m(m_mode_number_, &x_i, 
-              PhiS.data(), dPhiS_dx.data(), d2PhiS_dx2.data(), src1.data());
-          x_i.theta = M_PI_2 + 1e-2;
-          effsource_calc_m(m_mode_number_, &x_i, 
-              PhiS.data(), dPhiS_dx.data(), d2PhiS_dx2.data(), src2.data());
-          src[0] = 0.5 * (src1[0] + src2[0]);
-          src[1] = 0.5 * (src1[1] + src2[1]);
-        } else {
-          effsource_calc_m(m_mode_number_, &x_i, PhiS.data(), dPhiS_dx.data(),
-              d2PhiS_dx2.data(), src.data());
-        }
-
+        effsource_equatorial_ctx_calc_m(ctx, m_mode_number_, &x_i, PhiS.data(), dPhiS_dx.data(),
+            d2PhiS_dx2.data(), src.data());
         get(snapshot_effective_source)[j] =
             src[0] + std::complex<double>(0., 1.) * src[1];
         get(snapshot_singular_field)[j] =
@@ -620,6 +599,8 @@ EccentricOrbit::variables(
         get<1>(deriv_singular_field_evolution[i]) += add_term;
       }
     }
+
+    effsource_equatorial_free(ctx);
   }
 
   // only compute the n_modes of the singular field and its derivatives when 

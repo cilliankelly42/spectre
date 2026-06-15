@@ -2,10 +2,10 @@ set(LIBRARY EffectiveSource)
 
 add_library(${LIBRARY} 
   kerr-circular.c 
-  kerr-equatorial.c 
-  kerr-equatorial-coeffs.c 
-  kerr-equatorial-dtcoeffs.c 
-  kerr-equatorial-dttcoeffs.c
+  kerr-equatorial-ctx.c 
+  kerr-equatorial-coeffs-ctx.c 
+  kerr-equatorial-dtcoeffs-ctx.c 
+  kerr-equatorial-dttcoeffs-ctx.c
 )
 
 target_link_libraries(

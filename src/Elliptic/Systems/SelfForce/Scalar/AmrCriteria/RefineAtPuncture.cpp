@@ -52,12 +52,6 @@ std::array<amr::Flag, 2> RefineAtPuncture::impl(
             gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
               r_max - r_plus, M, orbit.black_hole_spin());
     }
-    /* const double r_star_min = 
-    gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
-        r_min - r_plus, M, eccentric_orbit.black_hole_spin());
-    const double r_star_max = 
-    gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
-      r_max - r_plus, M, eccentric_orbit.black_hole_spin()); */
 
     // Create a bounding box to represent the particle
     box puncture_box{{r_star_min, 0}, {r_star_max,0}};
