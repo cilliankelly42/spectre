@@ -8,6 +8,7 @@
 #include <effsource.hpp>
 #include <gsl/gsl_errno.h>
 #include <utility>
+#include <iostream>
 
 #include "DataStructures/Blaze/IntegerPow.hpp"
 #include "DataStructures/ComplexDataVector.hpp"
@@ -16,6 +17,7 @@
 #include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "Elliptic/Systems/SelfForce/Scalar/Tags.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
 #include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/Math.hpp"
@@ -60,7 +62,7 @@ CircularOrbit::CircularOrbit(const double black_hole_mass,
 }
 
 CircularOrbit::CircularOrbit(CkMigrateMessage* m)
-    : elliptic::analytic_data::Background(m),
+    : SelfForceBackground(m),
       elliptic::analytic_data::InitialGuess(m) {}
 
 tnsr::I<double, 2> CircularOrbit::puncture_position() const {
@@ -201,7 +203,7 @@ tuples::TaggedTuple<
     ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
     Tags::BoyerLindquistRadius>
 CircularOrbit::variables(
-    const tnsr::I<DataVector, 2>& x,
+    const tnsr::I<DataVector, 2>& x, bool on_worldtube_boundary,
     tmpl::list<
         ::Tags::FixedSource<Tags::MMode>, Tags::SingularField,
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
@@ -211,9 +213,10 @@ CircularOrbit::variables(
   const double r_0 = orbital_radius_;
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
   const double r_minus = M * (1. - sqrt(1. - square(black_hole_spin_)));
+
   {
     // Initialize effsource
-    effsource_init(M, a);
+    effsource_init_circular(M, a);
     coordinate xp{};
     xp.t = 0;
     xp.r = r_0;
@@ -226,7 +229,7 @@ CircularOrbit::variables(
     const double l = (M * (a * a + r_0 * r_0 - 2.0 * a * sqrt(M * r_0))) /
                      (sqrt(M * r_0) * sqrt(r_0 * r_0 - 3.0 * M * r_0 +
                                            2.0 * a * sqrt(M * r_0)));
-    effsource_set_particle(&xp, e, l, 0.);
+    effsource_set_particle_circular(&xp, e, l, 0.);
   }
   const auto& r_star_or_r = get<0>(x);
   if (hyperboloidal_slicing_transitions_.has_value() and
@@ -311,8 +314,9 @@ CircularOrbit::variables(
       x_i.r = r[i];
       x_i.theta = acos(cos_theta[i]);
       x_i.phi = 0;
-      effsource_calc_m(m_mode_number_, &x_i, PhiS.data(), dPhiS_dx.data(),
-                       d2PhiS_dx2.data(), src.data());
+      effsource_calc_m_circular(m_mode_number_, &x_i,
+          PhiS.data(), dPhiS_dx.data(),
+          d2PhiS_dx2.data(), src.data());
       get(effective_source)[i] = src[0] + std::complex<double>(0., 1.) * src[1];
       get(singular_field)[i] = PhiS[0] + std::complex<double>(0., 1.) * PhiS[1];
       get<0>(deriv_singular_field)[i] =
@@ -358,7 +362,7 @@ CircularOrbit::variables(
 }
 
 void CircularOrbit::pup(PUP::er& p) {
-  elliptic::analytic_data::Background::pup(p);
+  SelfForceBackground::pup(p);
   elliptic::analytic_data::InitialGuess::pup(p);
   p | black_hole_mass_;
   p | black_hole_spin_;

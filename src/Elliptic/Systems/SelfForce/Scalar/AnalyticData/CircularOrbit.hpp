@@ -18,6 +18,7 @@
 #include "NumericalAlgorithms/Spectral/Mesh.hpp"
 #include "Options/Auto.hpp"
 #include "Options/String.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/Background.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/InitialGuess.hpp"
 #include "Utilities/Gsl.hpp"
@@ -159,7 +160,7 @@ namespace ScalarSelfForce::AnalyticData {
  *     -im\Omega\Psi_m\big|_{r_*=r_*^u}
  * \end{align}
  */
-class CircularOrbit : public elliptic::analytic_data::Background,
+class CircularOrbit : public SelfForceBackground,
                       public elliptic::analytic_data::InitialGuess {
  public:
   struct BlackHoleMass {
@@ -229,12 +230,13 @@ class CircularOrbit : public elliptic::analytic_data::Background,
   using PUP::able::register_constructor;
   WRAPPED_PUPable_decl_template(CircularOrbit);
 
-  tnsr::I<double, 2> puncture_position() const;
-  double black_hole_mass() const { return black_hole_mass_; }
-  double black_hole_spin() const { return black_hole_spin_; }
-  double orbital_radius() const { return orbital_radius_; }
-  int m_mode_number() const { return m_mode_number_; }
-  double omega() const;
+  tnsr::I<double, 2> puncture_position() const override;
+  double black_hole_mass() const override { return black_hole_mass_; }
+  double black_hole_spin() const override { return black_hole_spin_; }
+  double semi_latus_rectum() const override { return orbital_radius_; }
+  double eccentricity() const override { return 0; }
+  double orbital_radius() const override { return orbital_radius_; }
+  int m_mode_number() const override { return m_mode_number_; }
   std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions()
       const {
     return hyperboloidal_slicing_transitions_;
@@ -252,7 +254,7 @@ class CircularOrbit : public elliptic::analytic_data::Background,
 
   // Background
   tuples::tagged_tuple_from_typelist<background_tags> variables(
-      const tnsr::I<DataVector, 2>& x, background_tags /*meta*/) const;
+      const tnsr::I<DataVector, 2>& x, background_tags /*meta*/) const override;
 
   // Initial guess
   static tuples::TaggedTuple<Tags::MMode> variables(
@@ -260,7 +262,8 @@ class CircularOrbit : public elliptic::analytic_data::Background,
 
   // Fixed sources
   tuples::tagged_tuple_from_typelist<source_tags> variables(
-      const tnsr::I<DataVector, 2>& x, source_tags /*meta*/) const;
+      const tnsr::I<DataVector, 2>& x, bool on_worldtube_boundary,
+      source_tags /*meta*/) const override;
 
   template <typename... RequestedTags>
   tuples::TaggedTuple<RequestedTags...> variables(

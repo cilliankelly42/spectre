@@ -29,6 +29,10 @@
 #include "NumericalAlgorithms/DiscontinuousGalerkin/Tags.hpp"
 #include "Parallel/AlgorithmExecution.hpp"
 #include "ParallelAlgorithms/Amr/Protocols/Projector.hpp"
+#include "ParallelAlgorithms/Initialization/MutateAssign.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/CircularOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
 #include "Utilities/CallWithDynamicType.hpp"
 #include "Utilities/MakeWithValue.hpp"
 #include "Utilities/TMPL.hpp"
@@ -122,13 +126,13 @@ struct InitializeEffectiveSource : tt::ConformsTo<::amr::protocols::Projector> {
       const Background& background, const bool massive, const Mesh<Dim>& mesh,
       const Scalar<DataVector>& det_inv_jacobian, const Metavariables& /*meta*/,
       const AmrData&... /*amr_data*/) {
-    const auto& circular_orbit =
-        dynamic_cast<const ScalarSelfForce::AnalyticData::CircularOrbit&>(
+    const auto& orbit =
+        dynamic_cast<const ScalarSelfForce::AnalyticData::SelfForceBackground&>(
             background);
 
-    // Determine the regularized region
-    const tnsr::I<double, Dim> puncture_pos =
-        circular_orbit.puncture_position();
+    // Check if this element and its neighbors solve for the regular field or
+    // the full field
+    const tnsr::I<double, 2> puncture_pos = orbit.puncture_position();
     const auto puncture_in_element =
         [&puncture_pos, &domain](const ElementId<Dim>& element_id) -> bool {
       // Regularize full block that contains the puncture
@@ -151,7 +155,8 @@ struct InitializeEffectiveSource : tt::ConformsTo<::amr::protocols::Projector> {
     const size_t num_points = mesh.number_of_grid_points();
     if (*field_is_regularized) {
       const auto vars =
-          circular_orbit.variables(inertial_coords, analytic_tags_list{});
+          orbit.variables(
+              inertial_coords, false, analytic_tags_list{});
       fixed_sources->initialize(num_points);
       singular_vars->initialize(num_points);
       get<::Tags::FixedSource<Tags::MMode>>(*fixed_sources) =
@@ -185,11 +190,11 @@ struct InitializeEffectiveSource : tt::ConformsTo<::amr::protocols::Projector> {
         // Both elements solve for the same field. No transformation needed.
         continue;
       }
-      const auto vars_on_mortar = circular_orbit.variables(
-          mortar_inertial_coords, analytic_tags_list{});
-      const auto background_on_mortar = circular_orbit.variables(
-          mortar_inertial_coords,
-          tmpl::list<Tags::Alpha, Tags::Beta, Tags::Gamma>{});
+      const auto vars_on_mortar = orbit.variables(
+          mortar_inertial_coords, true, analytic_tags_list{});
+      const auto background_on_mortar = orbit.variables(
+          mortar_inertial_coords, typename ScalarSelfForce::AnalyticData::
+                                      SelfForceBackground::background_tags{});
       auto& singular_vars_on_mortar = (*singular_vars_on_mortars)[mortar_id];
       singular_vars_on_mortar.initialize(
           mortar_inertial_coords.begin()->size());
