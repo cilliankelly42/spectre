@@ -29,6 +29,7 @@ target_link_libraries(
   ErrorHandling
   GeneralRelativity
   Integration
+  Interpolation
   InitialDataUtilities
   Options
   Utilities

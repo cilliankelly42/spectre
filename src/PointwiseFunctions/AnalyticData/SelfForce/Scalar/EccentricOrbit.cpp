@@ -96,7 +96,6 @@ EccentricOrbit::EccentricOrbit(const double black_hole_mass,
 EccentricOrbit::EccentricOrbit(CkMigrateMessage* m)
     : SelfForceBackground(m), elliptic::analytic_data::InitialGuess(m) {}
 
-
 tnsr::I<double, 2> EccentricOrbit::puncture_position() const {
   const double M = black_hole_mass_;
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
@@ -250,8 +249,8 @@ const double err = 1.0e-12;
 const double x_inclination = 1.0;
 korb_params orbpar;
 
-// Compute the particle trajectory and specify the number of time points
-// to store the coordinates at over one radial period
+// Compute the particle trajectory and specify the number of time points used 
+// over one radial period
 void EccentricOrbit::compute_trajectory(size_t time_points) {
   korb_getparams(ecc, inclined, black_hole_spin_, semi_latus_rectum_,
                  eccentricity_, x_inclination, err, &orbpar);
@@ -315,7 +314,6 @@ EccentricOrbit::variables(const tnsr::I<DataVector, 2>& x,
   const double M = black_hole_mass_;
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
   const double r_minus = M * (1. - sqrt(1. - square(black_hole_spin_)));
-  const double r_0 = semi_latus_rectum_;  // Adjust for AMR
   const auto& r_star = get<0>(x);
   const auto& cos_theta_or_sq = get<1>(x);
   DataVector cos_theta_sq;
@@ -388,11 +386,6 @@ tuples::TaggedTuple<Tags::MMode> EccentricOrbit::variables(
   return result;
 }
 
-// TODO skip the entire calculation of the n_modes of the puncture and its 
-// derivatives when on_worldtube_boundary=false. Currently, the time evolution 
-// of both of these are always computed, the only part that is skipped in the 
-// regularised region is the actual n_mode integral itself.
-
 // Fixed sources
 tuples::TaggedTuple<
     ::Tags::FixedSource<Tags::MMode>, Tags::SingularField,
@@ -450,8 +443,6 @@ EccentricOrbit::variables(
   const DataVector sin_theta_pow_m = integer_pow(sin_theta, m_mode_number_);
   const DataVector delta_phi = m_mode_number_ * a / (r_plus - r_minus) *
                                log((r - r_plus) / (r - r_minus));
-  double rmin = semi_latus_rectum_/(1+eccentricity_);
-  double rmax = semi_latus_rectum_/(1-eccentricity_);
   const ComplexDataVector rotation =
       cos(delta_phi) - std::complex<double>(0., 1.) * sin(delta_phi);
 
@@ -604,7 +595,7 @@ EccentricOrbit::variables(
   }
 
   // only compute the n_modes of the singular field and its derivatives when 
-  // crossing the worldtube because that's where they are needed
+  // crossing the worldtube
   
   if(on_worldtube_boundary){
     deriv_singular_field =
