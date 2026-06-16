@@ -38,9 +38,14 @@
 #include "Parallel/TypeTraits.hpp"
 #include "ParallelAlgorithms/Events/Tags.hpp"
 #include "ParallelAlgorithms/EventsAndTriggers/Event.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/CircularOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
+#include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
 #include "Utilities/ErrorHandling/Assert.hpp"
 #include "Utilities/ErrorHandling/Error.hpp"
 #include "Utilities/Functional.hpp"
+#include "Utilities/Gsl.hpp"
 #include "Utilities/OptionalHelpers.hpp"
 #include "Utilities/PrettyType.hpp"
 #include "Utilities/Serialization/CharmPupable.hpp"
@@ -103,11 +108,11 @@ class ObserveSelfForce : public Event {
       return;
     }
     const auto& background = get<BackgroundTag>(box);
-    const auto& circular_orbit =
-        dynamic_cast<const AnalyticData::CircularOrbit&>(background);
+    const auto& orbit =
+        dynamic_cast<const ScalarSelfForce::AnalyticData::SelfForceBackground&>(background);
     // Get element-logical coords of puncture
     const auto& domain = get<domain::Tags::Domain<2>>(box);
-    const auto puncture_position = circular_orbit.puncture_position();
+    const auto puncture_position = orbit.puncture_position();
     const auto& block = domain.blocks()[element_id.block_id()];
     const auto block_logical_coords =
         block_logical_coordinates_single_point(puncture_position, block);
@@ -139,11 +144,19 @@ class ObserveSelfForce : public Event {
     get<1>(deriv_field_at_puncture) = 0.;
     // Calculate self-force in r and theta coordinates
     tnsr::i<std::complex<double>, 2> self_force = deriv_field_at_puncture;
-    const double r0 = circular_orbit.orbital_radius();
-    const double M = circular_orbit.black_hole_mass();
-    const double spin = circular_orbit.black_hole_spin();
+    double r0;
+    if(dynamic_cast<const ScalarSelfForce::AnalyticData::EccentricOrbit*>(&orbit))
+    {
+      r0 = orbit.semi_latus_rectum();
+    }
+    if(dynamic_cast<const ScalarSelfForce::AnalyticData::CircularOrbit*>(&orbit))
+    {
+      r0 = orbit.orbital_radius();
+    }
+    const double M = orbit.black_hole_mass();
+    const double spin = orbit.black_hole_spin();
     const double a = M * spin;
-    const int m_mode = circular_orbit.m_mode_number();
+    const int m_mode = orbit.m_mode_number();
     const double r_plus = M * (1. + sqrt(1. - square(spin)));
     const double r_minus = M * (1. - sqrt(1. - square(spin)));
     const double alpha = 1. - 2. * M * r0 / (square(r0) + square(a));

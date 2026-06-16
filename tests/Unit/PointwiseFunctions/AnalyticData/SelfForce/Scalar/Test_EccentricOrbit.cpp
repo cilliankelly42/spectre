@@ -6,6 +6,7 @@
 #include <array>
 #include <complex>
 #include <cstddef>
+#include <iostream>
 
 #include "DataStructures/DataVector.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
@@ -17,19 +18,23 @@
 #include "NumericalAlgorithms/LinearOperators/Divergence.tpp"
 #include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
 #include "NumericalAlgorithms/Spectral/LogicalCoordinates.hpp"
-#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/CircularOrbit.hpp"
+#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
+#include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
 #include "Utilities/TMPL.hpp"
 #include "Utilities/TaggedTuple.hpp"
+#include "Domain/BlockLogicalCoordinates.hpp"
 
 namespace ScalarSelfForce::AnalyticData {
 
-SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.CircularOrbit",
+SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
                   "[PointwiseFunctions][Unit]") {
   // This test checks both the self-force equations and the effective source
   // computation in a very robust way: it ensures that the elliptic operator
   // applied to the singular field gives the effective source.
   // This is done numerically on a rectangular grid in (r_*, cos(theta)) near
   // the puncture.
+
+  // Set up a domain
   const double costheta_offset = 0.1;
   const double delta_costheta = 0.2;
   const double rstar_offset = 0.;
@@ -38,7 +43,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.CircularOrbit",
   const domain::creators::Rectangle domain_creator{
       {{rstar_offset, costheta_offset}},
       {{rstar_offset + delta_rstar, costheta_offset + delta_costheta}},
-      {{0, 0}},
+      {{1, 1}},
       {{npoints, npoints}},
       {{false, false}}};
   const auto domain = domain_creator.create_domain();
@@ -58,25 +63,25 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.CircularOrbit",
   CAPTURE(max(cos_theta));
 
   // Get the analytic fields
-  for (int m_mode_number = 0; m_mode_number < 3; ++m_mode_number) {
-    CAPTURE(m_mode_number);
-    const auto circular_orbit = CircularOrbit{
-        1., 0.9, 6., m_mode_number, {{-25., -5., 20., 40.}}, false};
-    CAPTURE(circular_orbit.puncture_position());
+  for (int n_mode_number = 0; n_mode_number < 3; ++n_mode_number) {
+
+    CAPTURE(n_mode_number);
+    const auto eccentric_orbit = EccentricOrbit{
+        1., 0.5, 10., 0.1, 2, n_mode_number,
+        {{-25., -5., 20., 40.}}, false, 500};
     const auto background =
-        circular_orbit.variables(x, CircularOrbit::background_tags{});
+        eccentric_orbit.variables(x, EccentricOrbit::background_tags{});
     const auto& alpha = get<Tags::Alpha>(background);
     const auto& beta = get<Tags::Beta>(background);
     const auto& gamma = get<Tags::Gamma>(background);
-    const auto vars = circular_orbit.variables(
-        x, true, CircularOrbit::source_tags{});
+    const auto vars = eccentric_orbit.variables(
+        x, true, EccentricOrbit::source_tags{});
     const auto& singular_field = get<Tags::SingularField>(vars);
     const auto& deriv_singular_field = get<
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(
         vars);
     const auto& effective_source = get<::Tags::FixedSource<Tags::MMode>>(vars);
 
-    // Take numeric derivative
     const auto numeric_deriv_singular_field =
         partial_derivative(singular_field, mesh, inv_jacobian);
     const Approx custom_approx = Approx::custom().epsilon(1.e-10).scale(1.);
@@ -94,6 +99,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.CircularOrbit",
     ScalarSelfForce::Sources::apply(make_not_null(&scalar_eqn), beta, gamma,
                                     singular_field, deriv_singular_field,
                                     flux_singular_field);
+
     // Minus sign is from the definition of the effective source:
     //   \psi = \psi_R + \psi_P = 0
     // where \psi_R is the regular part and \psi_P is the singular part
@@ -105,5 +111,4 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.CircularOrbit",
                                  custom_approx);
   }
 }
-
-}  // namespace ScalarSelfForce::AnalyticData
+}// namespace ScalarSelfForce::AnalyticData
