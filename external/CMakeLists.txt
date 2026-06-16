@@ -6,6 +6,7 @@ add_subdirectory(EffectiveSource)
 add_subdirectory(GravitationalEffectiveSource)
 add_subdirectory(SPHEREPACK)
 add_subdirectory(slatec)
+add_subdirectory(KerrGeodesicsC)
 
 set(LIBRARY Libsharp)
 set(LIBSHARP_LIBDIR ${CMAKE_CURRENT_BINARY_DIR}/libsharp/auto/lib)
