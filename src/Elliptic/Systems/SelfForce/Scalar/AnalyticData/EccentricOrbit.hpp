@@ -24,13 +24,12 @@
 #include "NumericalAlgorithms/Spectral/Mesh.hpp"
 #include "Options/Auto.hpp"
 #include "Options/String.hpp"
-//#include "PointwiseFunctions/InitialDataUtilities/Background.hpp"
-#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
+#include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/SelfForceBackground.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/Background.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/InitialGuess.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/TMPL.hpp"
-#include "Utilities/TaggedTuple.hpp"
+#include "DataStructures/TaggedTuple.hpp"
 
 namespace ScalarSelfForce::AnalyticData {
 
@@ -118,13 +117,16 @@ class EccentricOrbit : public SelfForceBackground,
   WRAPPED_PUPable_decl_template(EccentricOrbit);
 
   tnsr::I<double, 2> puncture_position() const override;
+  double omega_phi() const override { return Omega_phi; }
+  double omega_r() const override { return Omega_r; }
   double black_hole_mass() const override { return black_hole_mass_; }
   double black_hole_spin() const override { return black_hole_spin_; }
   double semi_latus_rectum() const override { return semi_latus_rectum_; }
   double eccentricity() const override { return eccentricity_; }
-  double orbital_radius() const override { return orbital_radius_; }
+  double orbital_radius() const override { return semi_latus_rectum_; }
   int m_mode_number() const override { return m_mode_number_; }
-  int n_mode_number() const { return n_mode_number_ ; }
+  int n_mode_number() const override { return n_mode_number_ ; }
+
   size_t time_points() const { return time_points_; }
   std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions()
       const {
@@ -190,8 +192,6 @@ class EccentricOrbit : public SelfForceBackground,
   std::vector<double> phi_of_t;
   std::vector<double> t_values;
   std::vector<double> u_r;
-  /* mutable std::unique_ptr<std::mutex> effsource_mutex = 
-    std::make_unique<std::mutex>(); */
 
  private:
   friend bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs);

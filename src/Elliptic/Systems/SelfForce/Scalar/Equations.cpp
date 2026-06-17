@@ -12,7 +12,7 @@
 #include "DataStructures/Variables.hpp"
 #include "Domain/Structure/DirectionalId.hpp"
 #include "Domain/Structure/DirectionalIdMap.hpp"
-#include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/CircularOrbit.hpp"
+#include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/SelfForceBackground.hpp"
 #include "Utilities/Algorithm.hpp"
 
 namespace ScalarSelfForce {
@@ -105,13 +105,15 @@ void ModifyBoundaryData::apply_linearized(
   // Apply the jump in the flux across the boundary to handle
   // vtu-slicing. The signs are all the same (on both sides of the boundary and
   // at both transition points).
-  const auto& circular_orbit =
-      dynamic_cast<const ScalarSelfForce::AnalyticData::CircularOrbit&>(
-          background);
-  const double omega = circular_orbit.omega();
-  const double m_mode_number = circular_orbit.m_mode_number();
+  const auto& orbit =
+        dynamic_cast<const ScalarSelfForce::AnalyticData::SelfForceBackground&>(
+            background);
+  const double Omega_phi = orbit.omega_phi();
+  const double Omega_r = orbit.omega_r();
+  const double m_mode_number = orbit.m_mode_number();
+  const double n_mode_number = orbit.n_mode_number();
   get(*n_dot_flux_remote) -=
-      std::complex<double>(0.0, m_mode_number * omega) *
+      std::complex<double>(0.0, m_mode_number * Omega_phi + n_mode_number * Omega_r) *
       (get(field_local) + get(*field_remote)) * 0.5;
 }
 

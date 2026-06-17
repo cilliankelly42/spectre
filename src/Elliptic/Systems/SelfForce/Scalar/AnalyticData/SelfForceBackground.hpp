@@ -24,6 +24,9 @@ namespace ScalarSelfForce::AnalyticData{
             virtual double eccentricity() const = 0;
             virtual double orbital_radius() const = 0;
             virtual int m_mode_number() const = 0;
+            virtual int n_mode_number() const = 0;
+            virtual double omega_phi() const = 0;
+            virtual double omega_r() const = 0;
 
             using background_tags =
               typename ScalarSelfForce::FirstOrderSystem::background_fields;

@@ -8,7 +8,6 @@
 #include <effsource.hpp>
 #include <gsl/gsl_errno.h>
 #include <utility>
-#include <iostream>
 
 #include "DataStructures/Blaze/IntegerPow.hpp"
 #include "DataStructures/ComplexDataVector.hpp"
@@ -17,7 +16,7 @@
 #include "DataStructures/Tensor/EagerMath/Magnitude.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "Elliptic/Systems/SelfForce/Scalar/Tags.hpp"
-#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
+#include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/SelfForceBackground.hpp"
 #include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/Math.hpp"
@@ -78,13 +77,6 @@ tnsr::I<double, 2> CircularOrbit::puncture_position() const {
   }
 }
 
-double CircularOrbit::omega() const {
-  const double M = black_hole_mass_;
-  const double a = black_hole_spin_ * M;
-  const double r_0 = orbital_radius_;
-  return 1. / (a + sqrt(cube(r_0) / M));
-}
-
 // Background
 tuples::TaggedTuple<Tags::Alpha, Tags::Beta, Tags::Gamma>
 CircularOrbit::variables(
@@ -94,7 +86,7 @@ CircularOrbit::variables(
   const double M = black_hole_mass_;
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
   const double r_minus = M * (1. - sqrt(1. - square(black_hole_spin_)));
-  const double omega = this->omega();
+  const double omega = this->omega_phi();
   const double k = m_mode_number_ * omega;
 
   // Resolve coordinates

@@ -18,7 +18,7 @@
 #include "NumericalAlgorithms/Spectral/Mesh.hpp"
 #include "Options/Auto.hpp"
 #include "Options/String.hpp"
-#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
+#include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/SelfForceBackground.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/Background.hpp"
 #include "PointwiseFunctions/InitialDataUtilities/InitialGuess.hpp"
 #include "Utilities/Gsl.hpp"
@@ -230,6 +230,11 @@ class CircularOrbit : public SelfForceBackground,
   using PUP::able::register_constructor;
   WRAPPED_PUPable_decl_template(CircularOrbit);
 
+  double omega_phi() const override {
+    return 1. / (black_hole_spin_ + 
+        sqrt(cube(orbital_radius_) / black_hole_mass_));
+    } 
+  double omega_r() const override { return 0; }
   tnsr::I<double, 2> puncture_position() const override;
   double black_hole_mass() const override { return black_hole_mass_; }
   double black_hole_spin() const override { return black_hole_spin_; }
@@ -237,6 +242,7 @@ class CircularOrbit : public SelfForceBackground,
   double eccentricity() const override { return 0; }
   double orbital_radius() const override { return orbital_radius_; }
   int m_mode_number() const override { return m_mode_number_; }
+  int n_mode_number() const override { return 0; }
   std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions()
       const {
     return hyperboloidal_slicing_transitions_;

@@ -11,16 +11,24 @@
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "Utilities/Gsl.hpp"
 
+extern "C" {
+#include "korb.h"
+}
+
 namespace ScalarSelfForce::BoundaryConditions {
 
 Sommerfeld::Sommerfeld(const double black_hole_mass,
                        const double black_hole_spin,
-                       const double orbital_radius, const int m_mode_number,
+                       const double semi_latus_rectum,
+                       const double eccentricity,
+                       const int m_mode_number, const int n_mode_number,
                        const bool hyperboloidal_slicing, const int order)
     : black_hole_mass_(black_hole_mass),
       black_hole_spin_(black_hole_spin),
-      orbital_radius_(orbital_radius),
+      semi_latus_rectum_(semi_latus_rectum),
+      eccentricity_(eccentricity),
       m_mode_number_(m_mode_number),
+      n_mode_number_(n_mode_number),
       hyperboloidal_slicing_(hyperboloidal_slicing),
       order_(order) {}
 
@@ -51,11 +59,24 @@ void Sommerfeld::apply(
     }
     return;
   }
+
+  // Calculate frequencies associated with the orbit
+  const int ecc = 1;
+  const int inclined = 0;
+  const double err = 1.0e-12;
+  const double x_inclination = 1.0;
+  korb_params orbpar;
+  korb_getparams(ecc, inclined, black_hole_spin_, semi_latus_rectum_,
+                   eccentricity_, x_inclination, err, &orbpar);
+  if(eccentricity_ == 0)
+  {
+    orbpar.wr = orbpar.wphi; // For eccentricity = 0 case
+  }
+  double Omega_r = orbpar.wr;
+  double Omega_phi = orbpar.wphi;
   const double a = black_hole_spin_ * black_hole_mass_;
   const double M = black_hole_mass_;
-  const double r_0 = orbital_radius_;
-  const double omega = 1. / (a + sqrt(cube(r_0) / M));
-  const double k = m_mode_number_ * omega;
+  const double k = (m_mode_number_ * Omega_phi) + (n_mode_number_ * Omega_r);
   if (order_ == 1) {
     get(*n_dot_flux) = std::complex<double>(0.0, k) * get(*field);
   } else if (order_ == 2) {
@@ -84,8 +105,10 @@ void Sommerfeld::pup(PUP::er& p) {
   Base::pup(p);
   p | black_hole_mass_;
   p | black_hole_spin_;
-  p | orbital_radius_;
+  p | semi_latus_rectum_;
+  p | eccentricity_;
   p | m_mode_number_;
+  p | n_mode_number_;
   p | hyperboloidal_slicing_;
   p | order_;
 }
@@ -93,8 +116,10 @@ void Sommerfeld::pup(PUP::er& p) {
 bool operator==(const Sommerfeld& lhs, const Sommerfeld& rhs) {
   return lhs.black_hole_mass_ == rhs.black_hole_mass_ and
          lhs.black_hole_spin_ == rhs.black_hole_spin_ and
-         lhs.orbital_radius_ == rhs.orbital_radius_ and
+         lhs.semi_latus_rectum_ == rhs.semi_latus_rectum_ and
+         lhs.eccentricity_ == rhs.eccentricity_ and
          lhs.m_mode_number_ == rhs.m_mode_number_ and
+         lhs.n_mode_number_ == rhs.n_mode_number_ and
          lhs.hyperboloidal_slicing_ == rhs.hyperboloidal_slicing_ and
          lhs.order_ == rhs.order_;
 }

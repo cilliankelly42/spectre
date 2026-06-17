@@ -1,7 +1,7 @@
 // Distributed under the MIT License.
 // See LICENSE.txt for details.
 
-#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/EccentricOrbit.hpp"
+#include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/EccentricOrbit.hpp"
 
 #include <algorithm>
 #include <blaze/math/Vector.h>
@@ -24,8 +24,7 @@
 #include <string>
 
 #include "DataStructures/Tensor/IndexType.hpp"
-#include "PointwiseFunctions/AnalyticData/SelfForce/Scalar/SelfForceBackground.hpp"
-#include "Utilities/TaggedTuple.hpp"
+#include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/SelfForceBackground.hpp"
 extern "C" {
 #include "korb.h"
 }
@@ -48,7 +47,7 @@ extern "C" {
 #include "NumericalAlgorithms/Integration/GslQuadAdaptive.hpp"
 #include "NumericalAlgorithms/Interpolation/CubicSpline.hpp"
 #include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
-#include "Utilities/ErrorHandling/GslErrorHandler.hpp"
+//#include "Utilities/ErrorHandling/GslErrorHandler.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/Math.hpp"
 #include "Utilities/Serialization/PupStlCpp17.hpp"
@@ -57,18 +56,15 @@ extern "C" {
 namespace ScalarSelfForce::AnalyticData {
 
 namespace {
-template <size_t Order>
 std::pair<DataVector, DataVector> boost_function_and_deriv(
     const DataVector& r_star, const std::array<double, 4>& transition_points) {
   return {
-      smoothstep<Order>(transition_points[0], transition_points[1], r_star) +
-          smoothstep<Order>(transition_points[2], transition_points[3],
-                            r_star) -
+      smoothstep<1>(transition_points[0], transition_points[1], r_star) +
+          smoothstep<1>(transition_points[2], transition_points[3], r_star) -
           1.0,
-      smoothstep_deriv<Order>(transition_points[0], transition_points[1],
-                              r_star) +
-          smoothstep_deriv<Order>(transition_points[2], transition_points[3],
-                                  r_star)};
+      smoothstep_deriv<1>(transition_points[0], transition_points[1], r_star) +
+          smoothstep_deriv<1>(transition_points[2], transition_points[3],
+                              r_star)};
 }
 }  // namespace
 
@@ -76,7 +72,8 @@ EccentricOrbit::EccentricOrbit(const double black_hole_mass,
                                const double black_hole_spin,
                                const double semi_latus_rectum,
                                const double eccentricity,
-                               const int m_mode_number, const int n_mode_number,
+                               const int m_mode_number, 
+                               const int n_mode_number,
                                const std::optional<std::array<double, 4>>
                                    hyperboloidal_slicing_transitions,
                                const bool impose_equatorial_symmetry,
@@ -109,7 +106,6 @@ tnsr::I<double, 2> EccentricOrbit::puncture_position() const {
 ComplexDataVector EccentricOrbit::compute_n_mode(
     std::vector<Scalar<ComplexDataVector>>& time_series_data, size_t num_points,
     double integral_tolerance) const {
-  gsl_throw_exceptions();
   ComplexDataVector result;
   result.destructive_resize(num_points);
 
@@ -162,7 +158,6 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
 tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
     std::vector<tnsr::i<ComplexDataVector, 2>>& time_series_data,
     size_t num_points, double integral_tolerance) const {
-  gsl_throw_exceptions();
   tnsr::i<ComplexDataVector, 2> result;
   get<0>(result).destructive_resize(num_points);
   get<1>(result).destructive_resize(num_points);
@@ -307,13 +302,15 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
 }
 
 // Background
-tuples::tagged_tuple_from_typelist<typename EccentricOrbit::background_tags>
-EccentricOrbit::variables(const tnsr::I<DataVector, 2>& x,
-                          background_tags /*meta*/) const {
+tuples::TaggedTuple<Tags::Alpha, Tags::Beta, Tags::Gamma>
+EccentricOrbit::variables(
+  const tnsr::I<DataVector, 2>& x,
+  tmpl::list<Tags::Alpha, Tags::Beta, Tags::Gamma> /*meta*/) const {
   const double a = black_hole_spin_ * black_hole_mass_;
   const double M = black_hole_mass_;
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
   const double r_minus = M * (1. - sqrt(1. - square(black_hole_spin_)));
+  const double k = m_mode_number() * Omega_phi + n_mode_number() * Omega_r;
   const auto& r_star = get<0>(x);
   const auto& cos_theta_or_sq = get<1>(x);
   DataVector cos_theta_sq;
@@ -333,46 +330,48 @@ EccentricOrbit::variables(const tnsr::I<DataVector, 2>& x,
   const DataVector sin_theta_squared = 1. - cos_theta_sq;
   const DataVector sigma_squared =
       r_sq_plus_a_sq_sq - square(a) * delta * sin_theta_squared;
-  tuples::tagged_tuple_from_typelist<background_tags> result{};
+  tuples::TaggedTuple<Tags::Alpha, Tags::Beta, Tags::Gamma> result{};
+  // Hyperboloidal slicing
+  ComplexDataVector H;
+  ComplexDataVector dH;
+  if (hyperboloidal_slicing_transitions_.has_value()) {
+    std::tie(H, dH) = boost_function_and_deriv(
+        r_star, hyperboloidal_slicing_transitions_.value());
+  } else {
+    H = make_with_value<ComplexDataVector>(r_star, 0.);
+    dH = make_with_value<ComplexDataVector>(r_star, 0.);
+  }
   auto& alpha = get<Tags::Alpha>(result);
   auto& beta = get<Tags::Beta>(result);
   auto& gamma = get<Tags::Gamma>(result);
-  get(alpha) = delta / r_sq_plus_a_sq_sq;
-  const ComplexDataVector temp1 =
-      1. / r * std::complex<double>(0., 2. * a * m_mode_number_);
-  get(beta) = (-square(m_mode_number_ * Omega_phi + n_mode_number_* Omega_r) *
-      sigma_squared + 4. * a * m_mode_number_ *
-      (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * M * r +
-               delta * (m_mode_number_ * (m_mode_number_ + 1) +
-                        2. * M / r * (1. - square(a) / M / r) + temp1)) /
-              r_sq_plus_a_sq_sq;
+  get<0>(alpha) = make_with_value<DataVector>(r_star, 1.0);
+  get<1>(alpha) = delta / r_sq_plus_a_sq_sq;
+  get(beta) = make_with_value<ComplexDataVector>(r_star, 0.);
+  for (size_t p = 0; p < get(beta).size(); ++p) {
+    get(beta)[p] =
+        square(k) *
+            (square(H[p]) - sigma_squared[p] / r_sq_plus_a_sq_sq[p]) +
+        2. * a * m_mode_number_ * k *
+            (2. * M * r[p] / r_sq_plus_a_sq[p] + H[p]) / r_sq_plus_a_sq[p];
+  }
+  get(beta) +=
+      get<1>(alpha) * (m_mode_number_ * (m_mode_number_ + 1) +
+                       2. * M / r * (1. - square(a) / M / r) +
+                       std::complex<double>(0., 2. * a * m_mode_number_) *
+                           (1. + a * Omega_phi * H) / r) -
+      std::complex<double>(0., k) * dH;
   get<0>(gamma) =
-      -1. / r_sq_plus_a_sq * std::complex<double>(0., 2. * a * m_mode_number_) +
-      2. * square(a) * get(alpha) / r;
-  get<1>(gamma) = 2. * m_mode_number_ * cos_theta_or_sq * get(alpha);
+      2. * square(a) * delta / (r * r_sq_plus_a_sq_sq) -
+      std::complex<double>(0., 2. * a * m_mode_number_) / r_sq_plus_a_sq -
+      std::complex<double>(0., 2. * k) * H;
+  get<1>(gamma) = 2. * m_mode_number_ * cos_theta_or_sq * get<1>(alpha);
   if (impose_equatorial_symmetry_) {
-    get<1>(gamma) += sin_theta_squared * get(alpha);
+    get<1>(gamma) += sin_theta_squared * get<1>(alpha);
     get<1>(gamma) *= 2.0;
   }
-  get(alpha) *= sin_theta_squared;
+  get<1>(alpha) *= sin_theta_squared;
   if (impose_equatorial_symmetry_) {
-    get(alpha) *= 4. * cos_theta_sq;
-  }
-  // Hyperboloidal slicing
-  if (hyperboloidal_slicing_transitions_.has_value()) {
-    const auto [H, dH] = boost_function_and_deriv<1>(
-        r_star, hyperboloidal_slicing_transitions_.value());
-    get(get<Tags::BoostFunction>(result)) = H;
-    get(get<Tags::BoostFunctionDeriv>(result)) = dH;
-    const double k = (m_mode_number_ * Omega_phi) + (n_mode_number_ * Omega_r);
-    get(beta) += std::complex<double>(0., -k) * dH + square(k) * square(H) +
-                 std::complex<double>(0., k) * get<0>(gamma) * H;
-    get<0>(gamma) -= std::complex<double>(0., 2. * k) * H;
-  } else {
-    get(get<Tags::BoostFunction>(result)) =
-        ComplexDataVector{r_star.size(), 0.};
-    get(get<Tags::BoostFunctionDeriv>(result)) =
-        ComplexDataVector{r_star.size(), 0.};
+    get<1>(alpha) *= 4. * cos_theta_sq;
   }
   return result;
 }
@@ -399,18 +398,17 @@ EccentricOrbit::variables(
         Tags::BoyerLindquistRadius> /*meta*/) const {
   const double a = black_hole_spin_ * black_hole_mass_;
   const double M = black_hole_mass_;
-  // const double r_0 = semi_latus_rectum_;  // Set to rmin/rmax
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
   const double r_minus = M * (1. - sqrt(1. - square(black_hole_spin_)));
 
   const auto& r_star = get<0>(x);
   if (hyperboloidal_slicing_transitions_.has_value() and
-      not((min(r_star) >= (*hyperboloidal_slicing_transitions_)[1] or
-           equal_within_roundoff(min(r_star),
-                                 (*hyperboloidal_slicing_transitions_)[1])) and
-          (max(r_star) <= (*hyperboloidal_slicing_transitions_)[2] or
-           equal_within_roundoff(max(r_star),
-                                 (*hyperboloidal_slicing_transitions_)[2])))) {
+      ((min(r_star) < (*hyperboloidal_slicing_transitions_)[1] and
+        not equal_within_roundoff(min(r_star),
+                                  (*hyperboloidal_slicing_transitions_)[1])) or
+       (max(r_star) > (*hyperboloidal_slicing_transitions_)[2] and
+        not equal_within_roundoff(max(r_star),
+                                  (*hyperboloidal_slicing_transitions_)[2])))) {
     ERROR(
         "The effective source is only valid where no hyperboloidal slicing is "
         "applied, which is in the r_* range ["
@@ -445,7 +443,6 @@ EccentricOrbit::variables(
                                log((r - r_plus) / (r - r_minus));
   const ComplexDataVector rotation =
       cos(delta_phi) - std::complex<double>(0., 1.) * sin(delta_phi);
-
   tuples::TaggedTuple<
       ::Tags::FixedSource<Tags::MMode>, Tags::SingularField,
       ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
