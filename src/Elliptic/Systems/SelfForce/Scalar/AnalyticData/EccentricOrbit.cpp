@@ -34,7 +34,6 @@ extern "C" {
 #include <cstddef>
 #include <effsource_equatorial.hpp>
 #include <gsl/gsl_errno.h>
-#include <iostream>
 #include <utility>
 
 #include "DataStructures/Blaze/IntegerPow.hpp"
@@ -47,7 +46,6 @@ extern "C" {
 #include "NumericalAlgorithms/Integration/GslQuadAdaptive.hpp"
 #include "NumericalAlgorithms/Interpolation/CubicSpline.hpp"
 #include "PointwiseFunctions/GeneralRelativity/TortoiseCoordinates.hpp"
-//#include "Utilities/ErrorHandling/GslErrorHandler.hpp"
 #include "Utilities/Gsl.hpp"
 #include "Utilities/Math.hpp"
 #include "Utilities/Serialization/PupStlCpp17.hpp"
@@ -76,6 +74,7 @@ EccentricOrbit::EccentricOrbit(const double black_hole_mass,
                                const int n_mode_number,
                                const std::optional<std::array<double, 4>>
                                    hyperboloidal_slicing_transitions,
+                               const bool penetrating_horizon,
                                const bool impose_equatorial_symmetry,
                                const size_t time_points)
     : black_hole_mass_(black_hole_mass),
@@ -85,8 +84,15 @@ EccentricOrbit::EccentricOrbit(const double black_hole_mass,
       m_mode_number_(m_mode_number),
       n_mode_number_(n_mode_number),
       hyperboloidal_slicing_transitions_(hyperboloidal_slicing_transitions),
+      penetrating_horizon_(penetrating_horizon),
       impose_equatorial_symmetry_(impose_equatorial_symmetry),
       time_points_(time_points) {
+  if (penetrating_horizon_ and
+      not hyperboloidal_slicing_transitions_.has_value()) {
+    ERROR(
+        "Hyperboloidal slicing must be enabled when penetrating_horizon is "
+        "true.");
+  }
   compute_trajectory(time_points_);
 }
 
@@ -97,9 +103,13 @@ tnsr::I<double, 2> EccentricOrbit::puncture_position() const {
   const double M = black_hole_mass_;
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
   const double r_0 = semi_latus_rectum_;
+  if (penetrating_horizon_) {
+    return tnsr::I<double, 2>{{{r_0, 0.}}};
+  } else {
   const double r_star = gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
       r_0 - r_plus, M, black_hole_spin_);
   return tnsr::I<double, 2>{{{r_star, 0.}}};
+  }
 }
 
 // Function to compute n-modes of a Scalar<ComplexDataVector> time series
@@ -311,7 +321,25 @@ EccentricOrbit::variables(
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
   const double r_minus = M * (1. - sqrt(1. - square(black_hole_spin_)));
   const double k = m_mode_number() * Omega_phi + n_mode_number() * Omega_r;
-  const auto& r_star = get<0>(x);
+
+  // Resolve coordinates
+  const auto& r_star_or_r = get<0>(x);
+  DataVector r;
+  DataVector r_star;
+  DataVector r_minus_r_plus;
+  if (penetrating_horizon_) {
+    // NOLINTNEXTLINE
+    r.set_data_ref(const_cast<DataVector*>(&r_star_or_r));
+    r_minus_r_plus = r - r_plus;
+    r_star = gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
+        r_minus_r_plus, M, black_hole_spin_);
+  } else {
+    // NOLINTNEXTLINE
+    r_star.set_data_ref(const_cast<DataVector*>(&r_star_or_r));
+    r_minus_r_plus = gr::boyer_lindquist_radius_minus_r_plus_from_tortoise(
+        r_star, M, black_hole_spin_);
+    r = r_minus_r_plus + r_plus;
+  }
   const auto& cos_theta_or_sq = get<1>(x);
   DataVector cos_theta_sq;
   if (impose_equatorial_symmetry_) {
@@ -320,10 +348,6 @@ EccentricOrbit::variables(
   } else {
     cos_theta_sq = square(cos_theta_or_sq);
   }
-  const DataVector r_minus_r_plus =
-      gr::boyer_lindquist_radius_minus_r_plus_from_tortoise(r_star, M,
-                                                            black_hole_spin_);
-  const DataVector r = r_minus_r_plus + r_plus;
   const DataVector delta = r_minus_r_plus * (r - r_minus);
   const DataVector r_sq_plus_a_sq = square(r) + square(a);
   const DataVector r_sq_plus_a_sq_sq = square(r_sq_plus_a_sq);
@@ -336,23 +360,36 @@ EccentricOrbit::variables(
   ComplexDataVector dH;
   if (hyperboloidal_slicing_transitions_.has_value()) {
     std::tie(H, dH) = boost_function_and_deriv(
-        r_star, hyperboloidal_slicing_transitions_.value());
+        r_star_or_r, hyperboloidal_slicing_transitions_.value());
   } else {
-    H = make_with_value<ComplexDataVector>(r_star, 0.);
-    dH = make_with_value<ComplexDataVector>(r_star, 0.);
+    H = make_with_value<ComplexDataVector>(r_star_or_r, 0.);
+    dH = make_with_value<ComplexDataVector>(r_star_or_r, 0.);
   }
   auto& alpha = get<Tags::Alpha>(result);
   auto& beta = get<Tags::Beta>(result);
   auto& gamma = get<Tags::Gamma>(result);
-  get<0>(alpha) = make_with_value<DataVector>(r_star, 1.0);
-  get<1>(alpha) = delta / r_sq_plus_a_sq_sq;
-  get(beta) = make_with_value<ComplexDataVector>(r_star, 0.);
+  if (penetrating_horizon_) {
+    get<0>(alpha) = delta / r_sq_plus_a_sq;
+    get<1>(alpha) = 1.0 / r_sq_plus_a_sq;
+  } else {
+    get<0>(alpha) = make_with_value<DataVector>(r_star_or_r, 1.0);
+    get<1>(alpha) = delta / r_sq_plus_a_sq_sq;
+  }
+  get(beta) = make_with_value<ComplexDataVector>(r_star_or_r, 0.);
   for (size_t p = 0; p < get(beta).size(); ++p) {
+    if (penetrating_horizon_ and equal_within_roundoff(r[p], r_plus)) {
+      // The following terms are zero at the horizon. Skip them to avoid
+      // division by zero.
+      continue;
+    }
     get(beta)[p] =
         square(k) *
             (square(H[p]) - sigma_squared[p] / r_sq_plus_a_sq_sq[p]) +
         2. * a * m_mode_number_ * k *
             (2. * M * r[p] / r_sq_plus_a_sq[p] + H[p]) / r_sq_plus_a_sq[p];
+    if (penetrating_horizon_) {
+      get(beta)[p] /= get<0>(alpha)[p];
+    }
   }
   get(beta) +=
       get<1>(alpha) * (m_mode_number_ * (m_mode_number_ + 1) +
@@ -400,22 +437,37 @@ EccentricOrbit::variables(
   const double M = black_hole_mass_;
   const double r_plus = M * (1. + sqrt(1. - square(black_hole_spin_)));
   const double r_minus = M * (1. - sqrt(1. - square(black_hole_spin_)));
-
-  const auto& r_star = get<0>(x);
+  const auto& r_star_or_r = get<0>(x);
   if (hyperboloidal_slicing_transitions_.has_value() and
-      ((min(r_star) < (*hyperboloidal_slicing_transitions_)[1] and
-        not equal_within_roundoff(min(r_star),
+      ((min(r_star_or_r) < (*hyperboloidal_slicing_transitions_)[1] and
+        not equal_within_roundoff(min(r_star_or_r),
                                   (*hyperboloidal_slicing_transitions_)[1])) or
-       (max(r_star) > (*hyperboloidal_slicing_transitions_)[2] and
-        not equal_within_roundoff(max(r_star),
+       (max(r_star_or_r) > (*hyperboloidal_slicing_transitions_)[2] and
+        not equal_within_roundoff(max(r_star_or_r),
                                   (*hyperboloidal_slicing_transitions_)[2])))) {
     ERROR(
         "The effective source is only valid where no hyperboloidal slicing is "
-        "applied, which is in the r_* range ["
+        "applied, which is in the radial range ["
         << (*hyperboloidal_slicing_transitions_)[1] << ", "
         << (*hyperboloidal_slicing_transitions_)[2]
-        << "], but was requested in the range [" << min(r_star) << ", "
-        << max(r_star) << "]");
+        << "], but was requested in the range [" << min(r_star_or_r) << ", "
+        << max(r_star_or_r) << "]");
+  }
+  DataVector r;
+  DataVector r_star;
+  DataVector r_minus_r_plus;
+  if (penetrating_horizon_) {
+    // NOLINTNEXTLINE
+    r.set_data_ref(const_cast<DataVector*>(&r_star_or_r));
+    r_minus_r_plus = r - r_plus;
+    r_star = gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
+        r_minus_r_plus, M, black_hole_spin_);
+  } else {
+    // NOLINTNEXTLINE
+    r_star.set_data_ref(const_cast<DataVector*>(&r_star_or_r));
+    r_minus_r_plus = gr::boyer_lindquist_radius_minus_r_plus_from_tortoise(
+        r_star, M, black_hole_spin_);
+    r = r_minus_r_plus + r_plus;
   }
   const auto& cos_theta_or_sq = get<1>(x);
   DataVector cos_theta;
@@ -429,10 +481,6 @@ EccentricOrbit::variables(
     cos_theta.set_data_ref(const_cast<DataVector*>(&cos_theta_or_sq));
     cos_theta_sq = square(cos_theta_or_sq);
   }
-  const DataVector r_minus_r_plus =
-    gr::boyer_lindquist_radius_minus_r_plus_from_tortoise(r_star, M,
-                                                            black_hole_spin_);
-  const DataVector r = r_minus_r_plus + r_plus;
   const DataVector delta = r_minus_r_plus * (r - r_minus);
   const DataVector r_sq_plus_a_sq = square(r) + square(a);
   const DataVector r_sq_plus_a_sq_sq = square(r_sq_plus_a_sq);
@@ -504,7 +552,6 @@ EccentricOrbit::variables(
     std::array<double, 20> d2PhiS_dx2{};
     std::array<double, 2> src{};
     struct effsource_equatorial_ctx * ctx = effsource_equatorial_create(M, a);
-
     for (size_t i = 0; i < t_values.size(); i++) {
       // Initialize effsource
       coordinate xp{};
@@ -532,53 +579,37 @@ EccentricOrbit::variables(
         get(effective_source_evolution[i]) = get(snapshot_effective_source);
         get(raw_source_evolution[i]) = get(snapshot_effective_source);
       }
-
+      // Rotate the source by delta_phi and multiply by r / 2 pi
       get(singular_field_evolution[i]) = get(snapshot_singular_field);
-
       get<0>(deriv_singular_field_evolution[i]) =
           get<0>(snapshot_deriv_singular_field);
       get<1>(deriv_singular_field_evolution[i]) =
           get<1>(snapshot_deriv_singular_field);
       get(effective_source_evolution[i]) *= rotation * 0.5 * r / M_PI;
-
       // Factor Delta * (r^2 + a^2 cos^2(theta)) / Sigma^2
       // Factor Sigma^2 / (r^2 + a^2)^2 from first-order formulation
       // Factor 1/sin(theta)^m from change of variables
-
-      get(effective_source_evolution[i]) *= delta * (square(r) + square(a) *
-          cos_theta_sq) / r_sq_plus_a_sq_sq / sin_theta_pow_m;
-      get(singular_field_evolution[i]) *= rotation * 0.5 * r / M_PI
-        / sin_theta_pow_m;
-
-      get<0>(deriv_singular_field_evolution[i]) *= rotation *
-        0.5 * r / M_PI / sin_theta_pow_m;
-
+      get(effective_source_evolution[i]) *= (square(r) + square(a) * cos_theta_sq) /
+                           (r_sq_plus_a_sq * sin_theta_pow_m);
+      if (not penetrating_horizon_) {
+        get(effective_source_evolution[i]) *= delta / r_sq_plus_a_sq;
+      }
+      get(singular_field_evolution[i]) *= rotation * 0.5 * r / M_PI / sin_theta_pow_m;
+      get<0>(deriv_singular_field_evolution[i]) *= rotation * 0.5 * r / M_PI / sin_theta_pow_m;
       get<0>(deriv_singular_field_evolution[i]) +=
-          get(singular_field_evolution[i]) / r -
-          std::complex<double>(0., a * m_mode_number_) /
+          get(singular_field_evolution[i]) / r - std::complex<double>(0., a * m_mode_number_) /
             delta * get(singular_field_evolution[i]);
-
-      get<0>(deriv_singular_field_evolution[i]) *= delta / r_sq_plus_a_sq;
-
-      get<1>(deriv_singular_field_evolution[i]) *= rotation * 0.5 *
-        r / M_PI / sin_theta_pow_m;
-
-    // This division is ok because the singular field is only evaluated at the
-    // worldtube boundary where sin(theta) != 0. Also, only the normal to the
-    // boundary is needed, so the angular derivative is discarded on the
-    // boundary that extends to cos_theta = 0. On Gauss-Lobatto grid we may
-    // have to work around this.
-
+      if (not penetrating_horizon_) {
+        get<0>(deriv_singular_field_evolution[i]) *= delta / r_sq_plus_a_sq;
+      }
+      get<1>(deriv_singular_field_evolution[i]) *= rotation * 0.5 * r / M_PI / sin_theta_pow_m;
       get<1>(deriv_singular_field_evolution[i]) /= -sin_theta;
-
       if (impose_equatorial_symmetry_) {
         get<1>(deriv_singular_field_evolution[i]) /= 2. * cos_theta;
       }
-
       {
         ComplexDataVector add_term =
-            m_mode_number_ * get(singular_field_evolution[i]) /
-            sin_theta_sq;
+            m_mode_number_ * get(singular_field_evolution[i]) / sin_theta_sq;
         if (impose_equatorial_symmetry_) {
           add_term *= 0.5;
         } else {
@@ -587,13 +618,11 @@ EccentricOrbit::variables(
         get<1>(deriv_singular_field_evolution[i]) += add_term;
       }
     }
-
     effsource_equatorial_free(ctx);
   }
 
   // only compute the n_modes of the singular field and its derivatives when 
   // crossing the worldtube
-  
   if(on_worldtube_boundary){
     deriv_singular_field =
       compute_n_mode(deriv_singular_field_evolution, num_points, 1e-10);
@@ -617,6 +646,7 @@ void EccentricOrbit::pup(PUP::er& p) {
   p | m_mode_number_;
   p | n_mode_number_;
   p | hyperboloidal_slicing_transitions_;
+  p | penetrating_horizon_;
   p | impose_equatorial_symmetry_;
   p | time_points_;
   p | t_values;
@@ -638,6 +668,7 @@ bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs) {
          lhs.n_mode_number_ == rhs.n_mode_number_ and
          lhs.hyperboloidal_slicing_transitions_ ==
              rhs.hyperboloidal_slicing_transitions_ and
+         lhs.penetrating_horizon_ == rhs.penetrating_horizon_ and
          lhs.impose_equatorial_symmetry_ == rhs.impose_equatorial_symmetry_ and
          lhs.time_points_ == rhs.time_points_;
          }

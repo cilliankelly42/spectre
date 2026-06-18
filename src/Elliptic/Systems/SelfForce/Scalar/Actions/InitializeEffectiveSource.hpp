@@ -20,7 +20,6 @@
 #include "Domain/Structure/ElementId.hpp"
 #include "Domain/Tags.hpp"
 #include "Elliptic/DiscontinuousGalerkin/Tags.hpp"
-#include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/CircularOrbit.hpp"
 #include "Elliptic/Systems/SelfForce/Scalar/Equations.hpp"
 #include "Elliptic/Systems/SelfForce/Scalar/Tags.hpp"
 #include "NumericalAlgorithms/DiscontinuousGalerkin/ApplyMassMatrix.hpp"

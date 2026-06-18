@@ -76,6 +76,13 @@ class EccentricOrbit : public SelfForceBackground,
         "the second and third points.";
     using type = Options::Auto<std::array<double, 4>, Options::AutoLabel::None>;
   };
+  struct PenetratingHorizon {
+    static constexpr Options::String help =
+        "If 'False', use tortoise radial coordinate where the Kerr horizon is "
+        "at negative infinity. If 'True', use Boyer-Lindquist radial "
+        "coordinate where the Kerr horizon is at r_+.";
+    using type = bool;
+  };
   struct ImposeEquatorialSymmetry {
     static constexpr Options::String help =
         "Impose symmetry across the equatorial plane by using cos(theta)^2 "
@@ -94,7 +101,7 @@ class EccentricOrbit : public SelfForceBackground,
   using options =
       tmpl::list<BlackHoleMass, BlackHoleSpin, SemiLatusRectum, Eccentricity,
         MModeNumber, NModeNumber, HyperboloidalSlicingTransitions,
-        ImposeEquatorialSymmetry, TimePoints>;
+        PenetratingHorizon, ImposeEquatorialSymmetry, TimePoints>;
   static constexpr Options::String help =
       "Quasicircular orbit of a scalar point charge in Kerr spacetime";
 
@@ -110,7 +117,9 @@ class EccentricOrbit : public SelfForceBackground,
       double black_hole_mass, double black_hole_spin, double semi_latus_rectum,
       double eccentricity, int m_mode_number, int n_mode_number,
       std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions,
-      bool impose_equatorial_symmetry, size_t time_points);
+      bool penetrating_horizon, 
+      bool impose_equatorial_symmetry, 
+      size_t time_points);
 
   explicit EccentricOrbit(CkMigrateMessage* m);
   using PUP::able::register_constructor;
@@ -126,21 +135,19 @@ class EccentricOrbit : public SelfForceBackground,
   double orbital_radius() const override { return semi_latus_rectum_; }
   int m_mode_number() const override { return m_mode_number_; }
   int n_mode_number() const override { return n_mode_number_ ; }
-
   size_t time_points() const { return time_points_; }
   std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions()
       const {
     return hyperboloidal_slicing_transitions_;
   }
+  bool penetrating_horizon() const { return penetrating_horizon_; }
   bool impose_equatorial_symmetry() const {
     return impose_equatorial_symmetry_;
   }
 
-  using background_tags =
-      typename ScalarSelfForce::FirstOrderSystem::background_fields;
+  using background_tags = tmpl::list<Tags::Alpha, Tags::Beta, Tags::Gamma>;
   using source_tags = tmpl::list<
-      ::Tags::FixedSource<Tags::MMode>,
-      Tags::SingularField,
+      ::Tags::FixedSource<Tags::MMode>, Tags::SingularField,
       ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>,
       Tags::BoyerLindquistRadius>;
 
@@ -153,9 +160,6 @@ class EccentricOrbit : public SelfForceBackground,
       const tnsr::I<DataVector, 2>& x, tmpl::list<Tags::MMode> /*meta*/);
 
   // Fixed sources
-  // Pass a boolean which says whether or not you want to compute the 
-  // n_modes of the puncture and its derivatives (should be true only when 
-  // crossing the worldtube only)
   tuples::tagged_tuple_from_typelist<source_tags> variables(
       const tnsr::I<DataVector, 2>& x, bool on_worldtube_boundary,
       source_tags /*meta*/) const override;
@@ -195,6 +199,7 @@ class EccentricOrbit : public SelfForceBackground,
 
  private:
   friend bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs);
+
   double black_hole_mass_{std::numeric_limits<double>::signaling_NaN()};
   double black_hole_spin_{std::numeric_limits<double>::signaling_NaN()};
   double semi_latus_rectum_{std::numeric_limits<double>::signaling_NaN()};
@@ -203,6 +208,7 @@ class EccentricOrbit : public SelfForceBackground,
   int m_mode_number_{};
   int n_mode_number_{};
   std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions_{};
+  bool penetrating_horizon_{false};
   bool impose_equatorial_symmetry_{false};
   size_t time_points_{};
   };
