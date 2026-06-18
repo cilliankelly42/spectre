@@ -87,6 +87,7 @@ void Sommerfeld::apply(
     ERROR("Order " << order_
                    << " not implemented for Sommerfeld boundary condition.");
   }
+  korb_freepar(orbpar);
 }
 
 void Sommerfeld::apply_linearized(

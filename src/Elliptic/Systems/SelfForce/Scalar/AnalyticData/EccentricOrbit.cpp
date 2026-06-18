@@ -247,16 +247,14 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
   return result;
 }
 
-// Define the orbital parameters as global variables
-const int ecc = 1;
-const int inclined = 0;
-const double err = 1.0e-12;
-const double x_inclination = 1.0;
-korb_params orbpar;
-
 // Compute the particle trajectory and specify the number of time points used 
 // over one radial period
 void EccentricOrbit::compute_trajectory(size_t time_points) {
+  const int ecc = 1;
+  const int inclined = 0;
+  const double err = 1.0e-12;
+  const double x_inclination = 1.0;
+  korb_params orbpar;
   korb_getparams(ecc, inclined, black_hole_spin_, semi_latus_rectum_,
                  eccentricity_, x_inclination, err, &orbpar);
   if(eccentricity_ == 0)
@@ -309,6 +307,7 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
                    (3 + eccentricity_ * gsl_sf_cos(chi_of_t[i])) /
                    semi_latus_rectum_));
   }
+  korb_freepar(orbpar);
 }
 
 // Background
