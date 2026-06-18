@@ -68,7 +68,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
     CAPTURE(n_mode_number);
     const auto eccentric_orbit = EccentricOrbit{
         1., 0.5, 10., 0.1, 2, n_mode_number,
-        {{-25., -5., 20., 40.}}, false, 500};
+        {{-25., -5., 20., 40.}}, false ,false, 500};
     const auto background =
         eccentric_orbit.variables(x, EccentricOrbit::background_tags{});
     const auto& alpha = get<Tags::Alpha>(background);

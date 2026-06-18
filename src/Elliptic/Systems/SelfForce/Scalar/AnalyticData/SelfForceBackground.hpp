@@ -27,6 +27,7 @@ namespace ScalarSelfForce::AnalyticData{
             virtual int n_mode_number() const = 0;
             virtual double omega_phi() const = 0;
             virtual double omega_r() const = 0;
+            virtual bool penetrating_horizon() const = 0;
 
             using background_tags =
               typename ScalarSelfForce::FirstOrderSystem::background_fields;
