@@ -10,7 +10,7 @@
 #include "DataStructures/Tensor/Tensor.hpp"
 #include "Domain/BlockLogicalCoordinates.hpp"
 #include "Domain/ElementLogicalCoordinates.hpp"
-#include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/CircularOrbit.hpp"
+#include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/SelfForceBackground.hpp"
 #include "NumericalAlgorithms/Interpolation/IrregularInterpolant.hpp"
 #include "NumericalAlgorithms/LinearOperators/PartialDerivatives.hpp"
 #include "NumericalAlgorithms/Spectral/Mesh.hpp"
@@ -19,12 +19,12 @@ namespace ScalarSelfForce::Events::detail {
 
 std::optional<tnsr::i<std::complex<double>, 2>> extract_self_force(
     const Domain<2>& domain, const ElementId<2>& element_id,
-    const AnalyticData::CircularOrbit& circular_orbit,
+    const AnalyticData::SelfForceBackground& orbit,
     const Scalar<ComplexDataVector>& field, const Mesh<2>& mesh,
     const InverseJacobian<DataVector, 2, Frame::ElementLogical,
                           Frame::Inertial>& inv_jacobian) {
   // Get element-logical coords of puncture
-  const auto puncture_position = circular_orbit.puncture_position();
+  const auto puncture_position = orbit.puncture_position();
   const auto& block = domain.blocks()[element_id.block_id()];
   const auto block_logical_coords =
       block_logical_coordinates_single_point(puncture_position, block);
@@ -51,15 +51,15 @@ std::optional<tnsr::i<std::complex<double>, 2>> extract_self_force(
   get<1>(deriv_field_at_puncture) = 0.;
   // Calculate self-force in r and theta coordinates
   tnsr::i<std::complex<double>, 2> self_force = deriv_field_at_puncture;
-  const double r0 = circular_orbit.orbital_radius();
-  const double M = circular_orbit.black_hole_mass();
-  const double spin = circular_orbit.black_hole_spin();
+  const double r0 = orbit.semi_latus_rectum();
+  const double M = orbit.black_hole_mass();
+  const double spin = orbit.black_hole_spin();
   const double a = M * spin;
-  const int m_mode = circular_orbit.m_mode_number();
+  const int m_mode = orbit.m_mode_number();
   const double r_plus = M * (1. + sqrt(1. - square(spin)));
   const double r_minus = M * (1. - sqrt(1. - square(spin)));
   get<0>(self_force) /= r0;
-  if (not circular_orbit.penetrating_horizon()) {
+  if (not orbit.penetrating_horizon()) {
     const double alpha = 1. - 2. * M * r0 / (square(r0) + square(a));
     get<0>(self_force) /= alpha;
   }

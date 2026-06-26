@@ -6,6 +6,8 @@
 #include <cstddef>
 
 #include "DataStructures/DataBox/PrefixHelpers.hpp"
+#include "DataStructures/DataBox/Prefixes.hpp"
+#include "DataStructures/Tensor/TypeAliases.hpp"
 #include "Domain/Creators/AlignedLattice.hpp"
 #include "Domain/RadiallyCompressedCoordinates.hpp"
 #include "Domain/Tags.hpp"
@@ -71,7 +73,11 @@ struct Metavariables {
   using observe_fields = tmpl::append<
       typename system::primal_fields, typename system::background_fields,
       tmpl::list<ScalarSelfForce::Tags::SingularField,
-                 ScalarSelfForce::Tags::BoyerLindquistRadius>,
+                 ScalarSelfForce::Tags::BoyerLindquistRadius,
+                ::Tags::DerivTensorCompute<ScalarSelfForce::Tags::MMode,
+                    ::domain::Tags::InverseJacobian<
+                        2, Frame::ElementLogical,Frame::Inertial>,
+              ::domain::Tags::Mesh<2>>>,
       typename solver::observe_fields,
       tmpl::list<domain::Tags::Coordinates<volume_dim, Frame::Inertial>,
                  domain::Tags::RadiallyCompressedCoordinatesCompute<

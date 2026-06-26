@@ -19,7 +19,7 @@
 #include "Domain/Creators/Tags/Domain.hpp"
 #include "Domain/Structure/ElementId.hpp"
 #include "Domain/Tags.hpp"
-#include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/CircularOrbit.hpp"
+#include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/SelfForceBackground.hpp"
 #include "Elliptic/Systems/SelfForce/Scalar/Tags.hpp"
 #include "Elliptic/Tags.hpp"
 #include "IO/Observer/GetSectionObservationKey.hpp"
@@ -51,7 +51,7 @@ namespace ScalarSelfForce::Events {
 namespace detail {
 std::optional<tnsr::i<std::complex<double>, 2>> extract_self_force(
     const Domain<2>& domain, const ElementId<2>& element_id,
-    const AnalyticData::CircularOrbit& circular_orbit,
+    const AnalyticData::SelfForceBackground& orbit,
     const Scalar<ComplexDataVector>& field, const Mesh<2>& mesh,
     const InverseJacobian<DataVector, 2, Frame::ElementLogical,
                           Frame::Inertial>& inv_jacobian);
@@ -141,12 +141,12 @@ class ObserveSelfForce : public Event {
     }
     // Extract self-force
     const auto& background = get<BackgroundTag>(box);
-    const auto& circular_orbit =
-        dynamic_cast<const AnalyticData::CircularOrbit&>(background);
+    const auto& orbit =
+        dynamic_cast<const AnalyticData::SelfForceBackground&>(background);
     const auto& mesh = get<domain::Tags::Mesh<2>>(box);
     const size_t num_points = mesh.number_of_grid_points();
     const auto self_force = detail::extract_self_force(
-        get<domain::Tags::Domain<2>>(box), element_id, circular_orbit,
+        get<domain::Tags::Domain<2>>(box), element_id, orbit,
         get<Tags::MMode>(box), mesh,
         get<domain::Tags::InverseJacobian<2, Frame::ElementLogical,
                                           Frame::Inertial>>(box));

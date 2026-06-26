@@ -41,22 +41,22 @@ std::array<amr::Flag, 2> RefineAtPuncture::impl(
     double r_or_rstar_min = get<0>(orbit.puncture_position());
     double r_or_rstar_max = get<0>(orbit.puncture_position());
     // If the orbit is eccentric, need to create a line
-    if(dynamic_cast<const ScalarSelfForce::AnalyticData::EccentricOrbit*>(&orbit))
-    {
-        r_min = orbit.semi_latus_rectum()/(1 + orbit.eccentricity());
-        r_max = orbit.semi_latus_rectum()/(1 - orbit.eccentricity());
-        if(orbit.penetrating_horizon()){
-            r_or_rstar_min = r_min;
-            r_or_rstar_max = r_max;
-        } else {
-        r_or_rstar_min = 
-            gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
-                r_min - r_plus, M, orbit.black_hole_spin());
-        r_or_rstar_max = 
-            gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
-              r_max - r_plus, M, orbit.black_hole_spin());
-        }
+    /* if(dynamic_cast<const ScalarSelfForce::AnalyticData::EccentricOrbit*>(&orbit))
+    { */
+    r_min = orbit.semi_latus_rectum()/(1 + orbit.eccentricity());
+    r_max = orbit.semi_latus_rectum()/(1 - orbit.eccentricity());
+    if(orbit.penetrating_horizon()){
+        r_or_rstar_min = r_min;
+        r_or_rstar_max = r_max;
+    } else {
+    r_or_rstar_min = 
+        gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
+            r_min - r_plus, M, orbit.black_hole_spin());
+    r_or_rstar_max = 
+        gr::tortoise_radius_from_boyer_lindquist_minus_r_plus(
+          r_max - r_plus, M, orbit.black_hole_spin());
     }
+    //}
 
     // Create a bounding box to represent the particle
     box puncture_box{{r_or_rstar_min, 0}, {r_or_rstar_max,0}};

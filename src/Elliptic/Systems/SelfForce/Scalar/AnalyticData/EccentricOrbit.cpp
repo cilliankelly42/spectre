@@ -218,28 +218,28 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
         return (1 / t_values[t_values.size() - 1]) * 
         re_interpolated_rstar_integrand(t);
       },
-      0, t_values[t_values.size() - 1], integral_tolerance, 6, integral_tolerance);
+      0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
     im_integral_0 = integration(
         [this, &im_interpolated_rstar_integrand](double t) {
           return (1 / t_values[t_values.size() - 1]) *
           im_interpolated_rstar_integrand(t);
         },
-        0, t_values[t_values.size() - 1], integral_tolerance, 6, integral_tolerance);
+        0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
       re_integral_1 = integration(
         [this, &re_interpolated_theta_integrand](double t) {
           return (1 / t_values[t_values.size() - 1]) *
           re_interpolated_theta_integrand(t);
         },
-        0, t_values[t_values.size() - 1], integral_tolerance, 6, integral_tolerance);
+        0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
     im_integral_1 = integration(
         [this, &im_interpolated_theta_integrand](double t) {
           return (1 / t_values[t_values.size() - 1]) *
           im_interpolated_theta_integrand(t);
         },
-        0, t_values[t_values.size() - 1], integral_tolerance, 6, integral_tolerance);
+        0, t_values[t_values.size() - 1], integral_tolerance, 6);
 
     get<0>(result)[i] = std::complex<double>(re_integral_0, im_integral_0);
     get<1>(result)[i] = std::complex<double>(re_integral_1, im_integral_1);
@@ -624,9 +624,9 @@ EccentricOrbit::variables(
   // crossing the worldtube
   if(on_worldtube_boundary){
     deriv_singular_field =
-      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-10);
+      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-8);
     get(singular_field) =
-      compute_n_mode(singular_field_evolution, num_points, 1e-10);
+      compute_n_mode(singular_field_evolution, num_points, 1e-8);
   }
 
   get(effective_source) =
