@@ -119,6 +119,10 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
   ComplexDataVector result;
   result.destructive_resize(num_points);
 
+  const integration::GslQuadAdaptive<
+      integration::GslIntegralType::StandardGaussKronrod> 
+      integration{5000};
+
   std::vector<double> re_gridpoint_to_interpolate(t_values.size());
   std::vector<double> im_gridpoint_to_interpolate(t_values.size());
 
@@ -138,10 +142,6 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
                                                  re_gridpoint_to_interpolate};
     intrp::CubicSpline im_interpolated_integrand{t_values,
                                                  im_gridpoint_to_interpolate};
-
-    const integration::GslQuadAdaptive<
-        integration::GslIntegralType::StandardGaussKronrod>
-        integration{5000};
 
     double re_integral = 0;
     double im_integral = 0;
@@ -575,10 +575,11 @@ EccentricOrbit::variables(
             dPhiS_dx[2] + std::complex<double>(0., 1.) * dPhiS_dx[3];
         get<1>(snapshot_deriv_singular_field)[j] =
             dPhiS_dx[4] + std::complex<double>(0., 1.) * dPhiS_dx[5];
-        get(effective_source_evolution[i]) = get(snapshot_effective_source);
-        get(raw_source_evolution[i]) = get(snapshot_effective_source);
       }
+
       // Rotate the source by delta_phi and multiply by r / 2 pi
+      get(effective_source_evolution[i]) = get(snapshot_effective_source);
+      get(raw_source_evolution[i]) = get(snapshot_effective_source);
       get(singular_field_evolution[i]) = get(snapshot_singular_field);
       get<0>(deriv_singular_field_evolution[i]) =
           get<0>(snapshot_deriv_singular_field);
@@ -621,12 +622,17 @@ EccentricOrbit::variables(
   }
 
   // only compute the n_modes of the singular field and its derivatives when 
-  // crossing the worldtube
+  // crossing the worldtube 
   if(on_worldtube_boundary){
     deriv_singular_field =
       compute_n_mode(deriv_singular_field_evolution, num_points, 1e-8);
+    try{
     get(singular_field) =
       compute_n_mode(singular_field_evolution, num_points, 1e-8);
+    } catch (const convergence_error& e)
+    {
+        std::cout << "Failed at function call\n";
+    }
   }
 
   get(effective_source) =

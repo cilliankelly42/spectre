@@ -13,6 +13,7 @@
 #include "Domain/Tags.hpp"
 #include "Elliptic/Actions/RunEventsAndTriggers.hpp"
 #include "Elliptic/BoundaryConditions/BoundaryCondition.hpp"
+#include "Elliptic/DiscontinuousGalerkin/Actions/ApplyOperator.hpp"
 #include "Elliptic/DiscontinuousGalerkin/DgElementArray.hpp"
 #include "Elliptic/Executables/Solver.hpp"
 #include "Elliptic/Systems/SelfForce/Scalar/Actions/InitializeEffectiveSource.hpp"
@@ -35,9 +36,11 @@
 #include "Parallel/PhaseDependentActionList.hpp"
 #include "Parallel/Protocols/RegistrationMetavariables.hpp"
 #include "Parallel/Reduction.hpp"
+#include "ParallelAlgorithms/Actions/MutateApply.hpp"
 #include "ParallelAlgorithms/Actions/TerminatePhase.hpp"
 #include "ParallelAlgorithms/Amr/Actions/SendAmrDiagnostics.hpp"
 #include "ParallelAlgorithms/Amr/Criteria/Factory.hpp"
+#include "ParallelAlgorithms/Amr/Projectors/DefaultInitialize.hpp"
 #include "ParallelAlgorithms/Amr/Protocols/AmrMetavariables.hpp"
 #include "ParallelAlgorithms/Events/Completion.hpp"
 #include "ParallelAlgorithms/Events/Factory.hpp"
@@ -173,6 +176,8 @@ struct Metavariables {
           Parallel::PhaseActions<
               Parallel::Phase::CheckDomain,
               tmpl::list<::amr::Actions::SendAmrDiagnostics,
+                ScalarSelfForce::Actions::InitializeEffectiveSource<system, typename solver::background_tag>,
+                ::Actions::MutateApply<elliptic::dg::Actions::ImposeInhomogeneousBoundaryConditionsOnSource<system, typename solver::fixed_sources_tag>>,
                          Parallel::Actions::TerminatePhase>>>,
       LinearSolver::multigrid::ElementsAllocator<
           volume_dim, typename solver::multigrid::options_group>>;
@@ -180,11 +185,15 @@ struct Metavariables {
   struct amr : tt::ConformsTo<::amr::protocols::AmrMetavariables> {
     using element_array = dg_element_array;
     using projectors =
-        tmpl::replace<typename solver::amr_projectors,
+        tmpl::replace<tmpl::replace<typename solver::amr_projectors,
                       elliptic::Actions::InitializeFixedSources<
                           system, typename solver::background_tag>,
-                      ScalarSelfForce::Actions::InitializeEffectiveSource<
-                          system, typename solver::background_tag>>;
+                      ::amr::projectors::DefaultInitialize<
+                          ScalarSelfForce::Actions::InitializeEffectiveSource<
+                          system, typename solver::background_tag>::simple_tags>>,
+                    elliptic::dg::Actions::ImposeInhomogeneousBoundaryConditionsOnSource<system, typename solver::fixed_sources_tag>,
+                    ::amr::projectors::DefaultInitialize<solver::fixed_sources_tag>
+                    >;
     static constexpr bool keep_coarse_grids = true;
     static constexpr bool p_refine_only_in_event = false;
   };

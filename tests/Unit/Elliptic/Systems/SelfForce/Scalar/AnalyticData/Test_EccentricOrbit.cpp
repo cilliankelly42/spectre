@@ -37,7 +37,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   // Set up a domain
   const double costheta_offset = 0.1;
   const double delta_costheta = 0.2;
-  const double rstar_offset = 0.;
+  const double rstar_offset = 9.;
   const double delta_rstar = 5.;
   const size_t npoints = 20;
   const domain::creators::Rectangle domain_creator{
@@ -63,12 +63,12 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   CAPTURE(max(cos_theta));
 
   // Get the analytic fields
-  for (int n_mode_number = 0; n_mode_number < 3; ++n_mode_number) {
+  for (int n_mode_number = -10; n_mode_number < -9; ++n_mode_number) {
 
     CAPTURE(n_mode_number);
     const auto eccentric_orbit = EccentricOrbit{
-        1., 0.5, 10., 0.1, 2, n_mode_number,
-        {{-25., -5., 20., 40.}}, false ,false, 500};
+        1., 0.5, 10., 0.1, 7, n_mode_number,
+        {{-25., -5., 20., 40.}}, false ,false, 16384};
     const auto background =
         eccentric_orbit.variables(x, EccentricOrbit::background_tags{});
     const auto& alpha = get<Tags::Alpha>(background);
