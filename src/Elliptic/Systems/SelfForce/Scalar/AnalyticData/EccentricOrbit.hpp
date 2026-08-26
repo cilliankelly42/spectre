@@ -175,13 +175,11 @@ class EccentricOrbit : public SelfForceBackground,
 
   ComplexDataVector compute_n_mode(
       std::vector<Scalar<ComplexDataVector>>& time_series_data,
-      size_t num_points,
-      double integral_tolerance) const;
+      size_t num_points) const;
 
   tnsr::i<ComplexDataVector, 2> compute_n_mode(
       std::vector<tnsr::i<ComplexDataVector, 2>>& time_series_data,
-      size_t num_points,
-      double integral_tolerance) const;
+      size_t num_points) const;
 
   void compute_trajectory(size_t time_points);
 

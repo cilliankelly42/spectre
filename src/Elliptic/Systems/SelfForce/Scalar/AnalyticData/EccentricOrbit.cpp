@@ -6,8 +6,9 @@
 #include <algorithm>
 #include <blaze/math/Vector.h>
 #include <boost/iterator/is_iterator.hpp>
-#include <complex.h>
+#include <ctime>
 #include <fftw3.h>
+#include <complex.h>
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_odeiv2.h>
@@ -114,136 +115,108 @@ tnsr::I<double, 2> EccentricOrbit::puncture_position() const {
 
 // Function to compute n-modes of a Scalar<ComplexDataVector> time series
 ComplexDataVector EccentricOrbit::compute_n_mode(
-    std::vector<Scalar<ComplexDataVector>>& time_series_data, size_t num_points,
-    double integral_tolerance) const {
+    std::vector<Scalar<ComplexDataVector>>& time_series_data, size_t num_points) const {
   ComplexDataVector result;
   result.destructive_resize(num_points);
 
-  const integration::GslQuadAdaptive<
-      integration::GslIntegralType::StandardGaussKronrod> 
-      integration{5000};
+  fftw_complex *in = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
+  fftw_complex *out = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
+  fftw_plan plan = fftw_plan_dft_1d(static_cast<int>(time_points()), in, out, FFTW_BACKWARD, FFTW_ESTIMATE);
 
-  std::vector<double> re_gridpoint_to_interpolate(t_values.size());
-  std::vector<double> im_gridpoint_to_interpolate(t_values.size());
-
-  for (size_t i = 0; i < num_points; i++) {
-    for (size_t j = 0; j < t_values.size(); j++) {
-      std::complex<double> phase_factor = std::exp(std::complex<double>(
-              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t_values[j]));
-      re_gridpoint_to_interpolate[j] = 
-        (get(time_series_data[j])[i].real() * phase_factor.real()) -
-        (get(time_series_data[j])[i].imag() * phase_factor.imag());
-
-      im_gridpoint_to_interpolate[j] = 
-        (get(time_series_data[j])[i].imag() * phase_factor.real()) + 
-        (get(time_series_data[j])[i].real() * phase_factor.imag());
-    }
-    intrp::CubicSpline re_interpolated_integrand{t_values,
-                                                 re_gridpoint_to_interpolate};
-    intrp::CubicSpline im_interpolated_integrand{t_values,
-                                                 im_gridpoint_to_interpolate};
-
-    double re_integral = 0;
-    double im_integral = 0;
-
-    re_integral = integration(
-        [this, &re_interpolated_integrand](double t) {
-          return (1 / t_values[t_values.size() - 1]) *
-          re_interpolated_integrand(t);
-        },
-        0, t_values[t_values.size() - 1], integral_tolerance, 6);
-
-    im_integral = integration(
-        [this, &im_interpolated_integrand](double t) {
-          return (1 / t_values[t_values.size() - 1]) *
-          im_interpolated_integrand(t);
-        },
-        0, t_values[t_values.size() - 1], integral_tolerance, 6);
-
-    result[i] = std::complex<double>(re_integral, im_integral);
+  std::vector<Scalar<ComplexDataVector>> shifted_time_series;
+  shifted_time_series.resize(time_points());
+  // Multiply the time series data by the phase in the Fourier integral
+  for(size_t k=0; k < time_points(); k++)
+  {
+    get(shifted_time_series[k]).destructive_resize(num_points);
+    get(shifted_time_series[k]) = get(time_series_data[k]) * 
+      std::exp(std::complex<double>(
+        0, m_mode_number_ * Omega_phi * t_values[k]));
   }
+
+  for(size_t i = 0; i < num_points; i++) {
+    for (size_t j = 0; j < time_points(); j++) {
+      in[j][0] = get(shifted_time_series[j])[i].real();
+      in[j][1] = get(shifted_time_series[j])[i].imag();
+    }
+    fftw_execute(plan);
+    //Normalize the output 
+    for(size_t k = 0; k < time_points(); k++)
+    {
+      out[k][0] = out[k][0]/time_points();
+      out[k][1] = out[k][1]/time_points();
+    }
+    const int int_tp = static_cast<int>(time_points());
+    int frequency_bin = ((n_mode_number_ % int_tp) + int_tp) % int_tp;
+    result[i] = std::complex<double>(out[frequency_bin][0], out[frequency_bin][1]);
+  }
+  fftw_destroy_plan(plan);
+  fftw_free(in);
+  fftw_free(out);
   return result;
 }
 
 tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
     std::vector<tnsr::i<ComplexDataVector, 2>>& time_series_data,
-    size_t num_points, double integral_tolerance) const {
+    size_t num_points) const {
   tnsr::i<ComplexDataVector, 2> result;
   get<0>(result).destructive_resize(num_points);
   get<1>(result).destructive_resize(num_points);
 
-  std::vector<double> re_rstar_deriv_integrand(t_values.size());
-  std::vector<double> im_rstar_deriv_integrand(t_values.size());
-  std::vector<double> re_theta_deriv_integrand(t_values.size());
-  std::vector<double> im_theta_deriv_integrand(t_values.size());
+  fftw_complex *in_r = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
+  fftw_complex *in_th = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
+  fftw_complex *out_r = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
+  fftw_complex *out_th = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
 
-  for (size_t i = 0; i < num_points; i++) {
-    for (size_t j = 0; j < t_values.size(); j++) {
-      std::complex<double> phase_factor = std::exp(std::complex<double>(
-              0, (m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r) * t_values[j]));
-      re_rstar_deriv_integrand[j] = 
-        (get<0>(time_series_data[j])[i].real() * phase_factor.real()) - 
-        (get<0>(time_series_data[j])[i].imag() * phase_factor.imag());
-      im_rstar_deriv_integrand[j] = 
-        (get<0>(time_series_data[j])[i].imag() * phase_factor.real()) + 
-        (get<0>(time_series_data[j])[i].real() * phase_factor.imag());
-      re_theta_deriv_integrand[j] = 
-        (get<1>(time_series_data[j])[i].real() * phase_factor.real()) - 
-        (get<1>(time_series_data[j])[i].imag() * phase_factor.imag());
-      im_theta_deriv_integrand[j] = 
-        (get<1>(time_series_data[j])[i].imag() * phase_factor.real()) +
-        (get<1>(time_series_data[j])[i].real() * phase_factor.imag());
-    }
+  fftw_plan r_plan = fftw_plan_dft_1d(time_points(), in_r, out_r, FFTW_BACKWARD, FFTW_ESTIMATE);
+  fftw_plan th_plan = fftw_plan_dft_1d(time_points(), in_th, out_th, FFTW_BACKWARD, FFTW_ESTIMATE);
 
-    intrp::CubicSpline re_interpolated_rstar_integrand{
-        t_values, re_rstar_deriv_integrand};
-    intrp::CubicSpline im_interpolated_rstar_integrand{
-        t_values, im_rstar_deriv_integrand};
-    intrp::CubicSpline re_interpolated_theta_integrand{
-        t_values, re_theta_deriv_integrand};
-    intrp::CubicSpline im_interpolated_theta_integrand{
-        t_values, im_theta_deriv_integrand};
+  std::vector<tnsr::i<ComplexDataVector, 2>> shifted_time_series;
+  shifted_time_series.resize(time_points());
 
-    double re_integral_0 = 0;
-    double im_integral_0 = 0;
-    double re_integral_1 = 0;
-    double im_integral_1 = 0;
-
-    const integration::GslQuadAdaptive<
-        integration::GslIntegralType::StandardGaussKronrod>
-        integration{5000};
-    re_integral_0 = integration(
-      [this, &re_interpolated_rstar_integrand](double t) 
-      {
-        return (1 / t_values[t_values.size() - 1]) * 
-        re_interpolated_rstar_integrand(t);
-      },
-      0, t_values[t_values.size() - 1], integral_tolerance, 6);
-
-    im_integral_0 = integration(
-        [this, &im_interpolated_rstar_integrand](double t) {
-          return (1 / t_values[t_values.size() - 1]) *
-          im_interpolated_rstar_integrand(t);
-        },
-        0, t_values[t_values.size() - 1], integral_tolerance, 6);
-
-      re_integral_1 = integration(
-        [this, &re_interpolated_theta_integrand](double t) {
-          return (1 / t_values[t_values.size() - 1]) *
-          re_interpolated_theta_integrand(t);
-        },
-        0, t_values[t_values.size() - 1], integral_tolerance, 6);
-
-    im_integral_1 = integration(
-        [this, &im_interpolated_theta_integrand](double t) {
-          return (1 / t_values[t_values.size() - 1]) *
-          im_interpolated_theta_integrand(t);
-        },
-        0, t_values[t_values.size() - 1], integral_tolerance, 6);
-
-    get<0>(result)[i] = std::complex<double>(re_integral_0, im_integral_0);
-    get<1>(result)[i] = std::complex<double>(re_integral_1, im_integral_1);
+  // Multiply the time series data by the phase in the Fourier integral
+  for(size_t k=0; k < time_points(); k++)
+  {
+    get<0>(shifted_time_series[k]).destructive_resize(num_points);
+    get<1>(shifted_time_series[k]).destructive_resize(num_points);
+    get<0>(shifted_time_series[k]) = get<0>(time_series_data[k]) * 
+      std::exp(std::complex<double>(
+        0, (m_mode_number_ * Omega_phi * t_values[k])));
+    get<1>(shifted_time_series[k]) = get<1>(time_series_data[k]) * 
+      std::exp(std::complex<double>(
+        0, (m_mode_number_ * Omega_phi * t_values[k])));
   }
+
+  //May need to check this
+  for(size_t i = 0; i < num_points; i++) {
+    for (size_t j = 0; j < time_points(); j++) {
+      in_r[j][0] = get<0>(shifted_time_series[j])[i].real();
+      in_r[j][1] = get<0>(shifted_time_series[j])[i].imag();
+      in_th[j][0] = get<1>(shifted_time_series[j])[i].real();
+      in_th[j][1] = get<1>(shifted_time_series[j])[i].imag();
+    }
+    fftw_execute(r_plan);
+    fftw_execute(th_plan);
+
+    //Normalize the output 
+    for(size_t k = 0; k < time_points(); k++)
+    {
+      out_r[k][0] = out_r[k][0]/time_points();
+      out_r[k][1] = out_r[k][1]/time_points();
+      out_th[k][0] = out_th[k][0]/time_points();
+      out_th[k][1] = out_th[k][1]/time_points();
+    }
+    const int int_tp = static_cast<int>(time_points());
+    int frequency_bin = ((n_mode_number_ % int_tp) + int_tp) % int_tp;
+    get<0>(result)[i] = std::complex<double>(out_r[frequency_bin][0], out_r[frequency_bin][1]);
+    get<1>(result)[i] = std::complex<double>(out_th[frequency_bin][0], out_th[frequency_bin][1]);
+  }
+  fftw_destroy_plan(r_plan);
+  fftw_free(in_r);
+  fftw_free(out_r);
+  fftw_destroy_plan(th_plan);
+  fftw_free(in_th);
+  fftw_free(out_th);
   return result;
 }
 
@@ -271,8 +244,7 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
   u_r.resize(time_points);
   double lambda_max = 2 * M_PI / (orbpar.Ga * orbpar.wr);
   double delta_lambda = lambda_max / (time_points - 1);
-  double t_max = 2 * M_PI / (orbpar.wr);
-  double delta_t = t_max / (time_points - 1);
+  double Tr = 2 * M_PI / (orbpar.wr); 
   std::vector<double> t_of_lambda(time_points + 1);
   std::vector<double> lambda_values(time_points + 1);
   double current_lambda = 0;
@@ -286,15 +258,13 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
   intrp::CubicSpline lambda_of_t{t_of_lambda, lambda_values};
 
   std::vector<double> chi_of_t(time_points + 1);
-  double current_t = 0;
-  size_t j = 0;
-  for (j = 0; j < time_points; j++) {
+  for (size_t j = 0; j < time_points; j++) {
+    double t = static_cast<double>(j) / time_points * Tr;
     r_of_t[j] =
-        korb_rfrompsi(korb_psifromla(lambda_of_t(current_t), orbpar), orbpar);
-    phi_of_t[j] = korb_phifromla(lambda_of_t(current_t), orbpar);
-    chi_of_t[j] = korb_psifromla(lambda_of_t(current_t), orbpar);
-    t_values[j] = current_t;
-    current_t += delta_t;
+        korb_rfrompsi(korb_psifromla(lambda_of_t(t), orbpar), orbpar);
+    phi_of_t[j] = korb_phifromla(lambda_of_t(t), orbpar);
+    chi_of_t[j] = korb_psifromla(lambda_of_t(t), orbpar);
+    t_values[j] = t;
   }
 
   // Compute the radial four velocity at each time
@@ -625,18 +595,13 @@ EccentricOrbit::variables(
   // crossing the worldtube 
   if(on_worldtube_boundary){
     deriv_singular_field =
-      compute_n_mode(deriv_singular_field_evolution, num_points, 1e-8);
-    try{
+      compute_n_mode(deriv_singular_field_evolution, num_points);
     get(singular_field) =
-      compute_n_mode(singular_field_evolution, num_points, 1e-8);
-    } catch (const convergence_error& e)
-    {
-        std::cout << "Failed at function call\n";
-    }
+      compute_n_mode(singular_field_evolution, num_points);
   }
 
   get(effective_source) =
-    compute_n_mode(effective_source_evolution, num_points, 1e-10);
+    compute_n_mode(effective_source_evolution, num_points);
 
   return result;
 }

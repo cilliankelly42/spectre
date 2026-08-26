@@ -6,7 +6,6 @@
 #include <array>
 #include <complex>
 #include <cstddef>
-#include <iostream>
 
 #include "DataStructures/DataVector.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
@@ -37,7 +36,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   // Set up a domain
   const double costheta_offset = 0.1;
   const double delta_costheta = 0.2;
-  const double rstar_offset = 9.;
+  const double rstar_offset = 0.;
   const double delta_rstar = 5.;
   const size_t npoints = 20;
   const domain::creators::Rectangle domain_creator{
@@ -63,12 +62,12 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   CAPTURE(max(cos_theta));
 
   // Get the analytic fields
-  for (int n_mode_number = -10; n_mode_number < -9; ++n_mode_number) {
+  for (int n_mode_number = 2; n_mode_number < 3; ++n_mode_number) {
 
     CAPTURE(n_mode_number);
     const auto eccentric_orbit = EccentricOrbit{
-        1., 0.5, 10., 0.1, 7, n_mode_number,
-        {{-25., -5., 20., 40.}}, false ,false, 16384};
+        1., 0.5, 10., 0.4, 2, n_mode_number,
+        {{-25., -5., 20., 40.}}, false, false, 1024};
     const auto background =
         eccentric_orbit.variables(x, EccentricOrbit::background_tags{});
     const auto& alpha = get<Tags::Alpha>(background);
@@ -88,7 +87,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
     for (size_t i = 0; i < deriv_singular_field.size(); ++i) {
       CAPTURE(i);
       CHECK_ITERABLE_CUSTOM_APPROX(numeric_deriv_singular_field[i],
-                                   deriv_singular_field[i], custom_approx);
+                                   deriv_singular_field[i], custom_approx);   
     }
 
     tnsr::I<ComplexDataVector, 2> flux_singular_field{};
@@ -108,7 +107,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
     // for the regular part is is the negative of the elliptic operator
     // acting on the singular part.
     CHECK_ITERABLE_CUSTOM_APPROX(get(scalar_eqn), -get(effective_source),
-                                 custom_approx);
+                                 custom_approx);  
   }
 }
 }// namespace ScalarSelfForce::AnalyticData
