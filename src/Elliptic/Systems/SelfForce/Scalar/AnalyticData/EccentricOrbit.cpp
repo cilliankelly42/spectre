@@ -6,9 +6,8 @@
 #include <algorithm>
 #include <blaze/math/Vector.h>
 #include <boost/iterator/is_iterator.hpp>
-#include <ctime>
-#include <fftw3.h>
 #include <complex.h>
+#include <fftw3.h>
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_odeiv2.h>
@@ -95,6 +94,7 @@ EccentricOrbit::EccentricOrbit(const double black_hole_mass,
         "true.");
   }
   compute_trajectory(time_points_);
+  build_fftw_plan();
 }
 
 EccentricOrbit::EccentricOrbit(CkMigrateMessage* m)
@@ -113,6 +113,17 @@ tnsr::I<double, 2> EccentricOrbit::puncture_position() const {
   }
 }
 
+void EccentricOrbit::build_fftw_plan() {
+  fftw_complex* dummy_in = static_cast<fftw_complex*>(
+      fftw_malloc(sizeof(fftw_complex) * time_points_));
+  fftw_complex* dummy_out = static_cast<fftw_complex*>(
+      fftw_malloc(sizeof(fftw_complex) * time_points_));
+  fft_plan_.reset(fftw_plan_dft_1d(static_cast<int>(time_points_), dummy_in,
+                                  dummy_out, FFTW_BACKWARD, FFTW_MEASURE));
+  fftw_free(dummy_in);
+  fftw_free(dummy_out);
+}
+
 // Function to compute n-modes of a Scalar<ComplexDataVector> time series
 ComplexDataVector EccentricOrbit::compute_n_mode(
     std::vector<Scalar<ComplexDataVector>>& time_series_data, size_t num_points) const {
@@ -121,7 +132,6 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
 
   fftw_complex *in = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
   fftw_complex *out = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
-  fftw_plan plan = fftw_plan_dft_1d(static_cast<int>(time_points()), in, out, FFTW_BACKWARD, FFTW_ESTIMATE);
 
   std::vector<Scalar<ComplexDataVector>> shifted_time_series;
   shifted_time_series.resize(time_points());
@@ -139,18 +149,19 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
       in[j][0] = get(shifted_time_series[j])[i].real();
       in[j][1] = get(shifted_time_series[j])[i].imag();
     }
-    fftw_execute(plan);
+    // Execute the member plan for thread-safety
+    fftw_execute_dft(fft_plan_.get(), in, out);
+
     //Normalize the output 
     for(size_t k = 0; k < time_points(); k++)
     {
-      out[k][0] = out[k][0]/time_points();
-      out[k][1] = out[k][1]/time_points();
+      out[k][0] /= time_points();
+      out[k][1] /= time_points();
     }
     const int int_tp = static_cast<int>(time_points());
     int frequency_bin = ((n_mode_number_ % int_tp) + int_tp) % int_tp;
     result[i] = std::complex<double>(out[frequency_bin][0], out[frequency_bin][1]);
   }
-  fftw_destroy_plan(plan);
   fftw_free(in);
   fftw_free(out);
   return result;
@@ -167,9 +178,6 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
   fftw_complex *in_th = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
   fftw_complex *out_r = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
   fftw_complex *out_th = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
-
-  fftw_plan r_plan = fftw_plan_dft_1d(time_points(), in_r, out_r, FFTW_BACKWARD, FFTW_ESTIMATE);
-  fftw_plan th_plan = fftw_plan_dft_1d(time_points(), in_th, out_th, FFTW_BACKWARD, FFTW_ESTIMATE);
 
   std::vector<tnsr::i<ComplexDataVector, 2>> shifted_time_series;
   shifted_time_series.resize(time_points());
@@ -195,26 +203,24 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
       in_th[j][0] = get<1>(shifted_time_series[j])[i].real();
       in_th[j][1] = get<1>(shifted_time_series[j])[i].imag();
     }
-    fftw_execute(r_plan);
-    fftw_execute(th_plan);
+    fftw_execute_dft(fft_plan_.get(), in_r, out_r);
+    fftw_execute_dft(fft_plan_.get(), in_th, out_th);
 
     //Normalize the output 
     for(size_t k = 0; k < time_points(); k++)
     {
-      out_r[k][0] = out_r[k][0]/time_points();
-      out_r[k][1] = out_r[k][1]/time_points();
-      out_th[k][0] = out_th[k][0]/time_points();
-      out_th[k][1] = out_th[k][1]/time_points();
+      out_r[k][0] /= time_points();
+      out_r[k][1] /= time_points();
+      out_th[k][0] /= time_points();
+      out_th[k][1] /= time_points();
     }
     const int int_tp = static_cast<int>(time_points());
     int frequency_bin = ((n_mode_number_ % int_tp) + int_tp) % int_tp;
     get<0>(result)[i] = std::complex<double>(out_r[frequency_bin][0], out_r[frequency_bin][1]);
     get<1>(result)[i] = std::complex<double>(out_th[frequency_bin][0], out_th[frequency_bin][1]);
   }
-  fftw_destroy_plan(r_plan);
   fftw_free(in_r);
   fftw_free(out_r);
-  fftw_destroy_plan(th_plan);
   fftw_free(in_th);
   fftw_free(out_th);
   return result;
@@ -627,6 +633,10 @@ void EccentricOrbit::pup(PUP::er& p) {
   p | Omega_r;
   p | energy;
   p | angular_momentum;
+
+  if (p.isUnpacking()) {
+    build_fftw_plan();
+  }
 }
 
 bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs) {

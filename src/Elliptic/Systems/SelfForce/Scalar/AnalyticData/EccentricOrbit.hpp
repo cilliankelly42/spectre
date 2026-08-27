@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstddef>
+#include <fftw3.h>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -110,7 +111,7 @@ class EccentricOrbit : public SelfForceBackground,
   EccentricOrbit& operator=(const EccentricOrbit&) = default;
   EccentricOrbit(EccentricOrbit&&) = default;
   EccentricOrbit& operator=(EccentricOrbit&&) = default;
-  ~EccentricOrbit() override = default;
+  ~EccentricOrbit() override = default; 
 
   // Modify for Eccentric orbit
   EccentricOrbit(
@@ -197,6 +198,12 @@ class EccentricOrbit : public SelfForceBackground,
 
  private:
   friend bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs);
+
+  void build_fftw_plan();
+  struct FftwPlanDeleter {
+  void operator()(fftw_plan p) const { fftw_destroy_plan(p); }
+  };
+  std::unique_ptr<std::remove_pointer_t<fftw_plan>, FftwPlanDeleter> fft_plan_;
 
   double black_hole_mass_{std::numeric_limits<double>::signaling_NaN()};
   double black_hole_spin_{std::numeric_limits<double>::signaling_NaN()};
