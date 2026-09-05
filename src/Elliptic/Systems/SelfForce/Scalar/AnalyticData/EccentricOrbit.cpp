@@ -7,6 +7,9 @@
 #include <blaze/math/Vector.h>
 #include <boost/iterator/is_iterator.hpp>
 #include <complex.h>
+extern "C" {
+#include <effsource_equatorial.h>
+}
 #include <fftw3.h>
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_math.h>
@@ -22,7 +25,6 @@
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/point_xy.hpp>
 #include <string>
-
 #include "DataStructures/Tensor/IndexType.hpp"
 #include "Elliptic/Systems/SelfForce/Scalar/AnalyticData/SelfForceBackground.hpp"
 extern "C" {
@@ -248,6 +250,7 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
   phi_of_t.resize(time_points);
   t_values.resize(time_points);
   u_r.resize(time_points);
+  source_coefficients.resize(time_points);
   double lambda_max = 2 * M_PI / (orbpar.Ga * orbpar.wr);
   double delta_lambda = lambda_max / (time_points - 1);
   double Tr = 2 * M_PI / (orbpar.wr); 
@@ -283,7 +286,20 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
                    (3 + eccentricity_ * gsl_sf_cos(chi_of_t[i])) /
                    semi_latus_rectum_));
   }
+
   korb_freepar(orbpar);
+
+  for (size_t i=0; i < source_coefficients.size(); i++)
+  {
+    coordinate xp{};
+    xp.t = t_values[i];
+    xp.r = r_of_t[i];
+    xp.theta = M_PI_2;
+    xp.phi = phi_of_t[i];
+    struct effsource_equatorial_ctx * ctx = effsource_equatorial_create(black_hole_mass_, black_hole_spin_);
+    effsource_equatorial_ctx_set_particle(ctx, &xp, energy, angular_momentum, u_r[i]);
+    source_coefficients[i] = ctx;
+  }
 }
 
 // Background
@@ -526,22 +542,13 @@ EccentricOrbit::variables(
     std::array<double, 8> dPhiS_dx{};
     std::array<double, 20> d2PhiS_dx2{};
     std::array<double, 2> src{};
-    struct effsource_equatorial_ctx * ctx = effsource_equatorial_create(M, a);
-    for (size_t i = 0; i < t_values.size(); i++) {
-      // Initialize effsource
-      coordinate xp{};
-      xp.t = t_values[i];
-      xp.r = r_of_t[i];
-      xp.theta = M_PI_2;
-      xp.phi = phi_of_t[i];
-      x_i.t = t_values[i];
-      effsource_equatorial_ctx_set_particle(ctx, &xp, energy, angular_momentum, u_r[i]);
-
+    for (size_t i = 0; i < time_points(); i++) {
       for (size_t j = 0; j < num_points; j++) {
+        x_i.t = t_values[j];
         x_i.r = r[j];
         x_i.theta = acos(cos_theta[j]);
         x_i.phi = 0;
-        effsource_equatorial_ctx_calc_m(ctx, m_mode_number_, &x_i, PhiS.data(), dPhiS_dx.data(),
+        effsource_equatorial_ctx_calc_m(source_coefficients[i], m_mode_number_, &x_i, PhiS.data(), dPhiS_dx.data(),
             d2PhiS_dx2.data(), src.data());
         get(snapshot_effective_source)[j] =
             src[0] + std::complex<double>(0., 1.) * src[1];
@@ -594,7 +601,6 @@ EccentricOrbit::variables(
         get<1>(deriv_singular_field_evolution[i]) += add_term;
       }
     }
-    effsource_equatorial_free(ctx);
   }
 
   // only compute the n_modes of the singular field and its derivatives when 
@@ -636,6 +642,18 @@ void EccentricOrbit::pup(PUP::er& p) {
 
   if (p.isUnpacking()) {
     build_fftw_plan();
+    source_coefficients.resize(time_points());
+    for(size_t i=0; i<time_points(); i++)
+    {
+      coordinate xp{};
+      xp.t = t_values[i];
+      xp.r = r_of_t[i];
+      xp.theta = M_PI_2;
+      xp.phi = phi_of_t[i];
+      struct effsource_equatorial_ctx * ctx = effsource_equatorial_create(black_hole_mass_, black_hole_spin_);
+      effsource_equatorial_ctx_set_particle(ctx, &xp, energy, angular_momentum, u_r[i]);
+      source_coefficients[i] = ctx;
+    }
   }
 }
 

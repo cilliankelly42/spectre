@@ -5,6 +5,9 @@
 
 #include <array>
 #include <cstddef>
+extern "C" {
+    #include <effsource_equatorial.h>
+}
 #include <fftw3.h>
 #include <limits>
 #include <memory>
@@ -14,6 +17,7 @@
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/point_xy.hpp>
+#include <effsource_equatorial.hpp>
 
 #include "DataStructures/ComplexDataVector.hpp"
 #include "DataStructures/DataBox/Prefixes.hpp"
@@ -107,11 +111,16 @@ class EccentricOrbit : public SelfForceBackground,
       "Quasicircular orbit of a scalar point charge in Kerr spacetime";
 
   EccentricOrbit() = default;
-  EccentricOrbit(const EccentricOrbit&) = default;
-  EccentricOrbit& operator=(const EccentricOrbit&) = default;
+  EccentricOrbit(const EccentricOrbit&) = delete;
+  EccentricOrbit& operator=(const EccentricOrbit&) = delete;
   EccentricOrbit(EccentricOrbit&&) = default;
   EccentricOrbit& operator=(EccentricOrbit&&) = default;
-  ~EccentricOrbit() override = default; 
+  ~EccentricOrbit() override {
+      for(auto* ctx : source_coefficients)
+      {
+          effsource_equatorial_free(ctx);
+      }
+  }
 
   // Modify for Eccentric orbit
   EccentricOrbit(
@@ -195,6 +204,7 @@ class EccentricOrbit : public SelfForceBackground,
   std::vector<double> phi_of_t;
   std::vector<double> t_values;
   std::vector<double> u_r;
+  std::vector<effsource_equatorial_ctx*> source_coefficients;
 
  private:
   friend bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs);
