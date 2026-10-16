@@ -8,7 +8,6 @@
 extern "C" {
     #include <effsource_equatorial.h>
 }
-#include <fftw3.h>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -217,13 +216,6 @@ class EccentricOrbit : public SelfForceBackground,
 
  private:
   friend bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs);
-
-  void build_fftw_plan(size_t n_phi);
-  struct FftwPlanDeleter {
-  void operator()(fftw_plan p) const { fftw_destroy_plan(p); }
-  };
-  std::unique_ptr<std::remove_pointer_t<fftw_plan>, FftwPlanDeleter> fft_plan_t;
-  std::unique_ptr<std::remove_pointer_t<fftw_plan>, FftwPlanDeleter> fft_plan_phi;
 
   double black_hole_mass_{std::numeric_limits<double>::signaling_NaN()};
   double black_hole_spin_{std::numeric_limits<double>::signaling_NaN()};

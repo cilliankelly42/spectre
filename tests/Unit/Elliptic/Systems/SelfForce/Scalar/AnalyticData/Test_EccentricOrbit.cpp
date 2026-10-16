@@ -6,7 +6,7 @@
 #include <array>
 #include <complex>
 #include <cstddef>
-#include <fstream>
+//#include <fstream>
 
 #include "DataStructures/DataVector.hpp"
 #include "DataStructures/Tensor/Tensor.hpp"
@@ -43,7 +43,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
   const domain::creators::Rectangle domain_creator{
       {{rstar_offset, costheta_offset}},
       {{rstar_offset + delta_rstar, costheta_offset + delta_costheta}},
-      {{1, 1}},
+      {{0, 0}},
       {{npoints, npoints}},
       {{false, false}}};
   const auto domain = domain_creator.create_domain();
@@ -68,7 +68,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
     CAPTURE(n_mode_number);
     const auto eccentric_orbit = EccentricOrbit{
         1., 0.5, 10., 0.4, 2, n_mode_number,
-        {{-25., -5., 20., 40.}}, false, false, 4096};
+        {{-25., -5., 20., 40.}}, false, false, 256, 128};
     const auto background =
         eccentric_orbit.variables(x, EccentricOrbit::background_tags{});
     const auto& alpha = get<Tags::Alpha>(background);
@@ -81,7 +81,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
         ::Tags::deriv<Tags::SingularField, tmpl::size_t<2>, Frame::Inertial>>(
         vars);
     const auto& effective_source = get<::Tags::FixedSource<Tags::MMode>>(vars);
-    std::ofstream output_source("/home/cillian/debug/spectre_fftw_source/n_mode_source_FFT");
+    /* std::ofstream output_source("/home/cillian/debug/spectre_fftw_source/n_mode_source_FFT");
     output_source << "rstar\tz\tRe_src\tIm_src\n";
     for(size_t k = 0; k < get<0>(x).size(); k++)
     {
@@ -90,7 +90,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
             << get(effective_source)[k].imag() << "\n";
     }
     output_source.close();
-
+ */
     const auto numeric_deriv_singular_field =
         partial_derivative(singular_field, mesh, inv_jacobian);
     const Approx custom_approx = Approx::custom().epsilon(1.e-10).scale(1.);
@@ -117,7 +117,7 @@ SPECTRE_TEST_CASE("Unit.PointwiseFunctions.ScalarSelfForce.EccentricOrbit",
     // for the regular part is is the negative of the elliptic operator
     // acting on the singular part.
     CHECK_ITERABLE_CUSTOM_APPROX(get(scalar_eqn), -get(effective_source),
-                                 custom_approx);
+                                 custom_approx); 
   }
 }
 }// namespace ScalarSelfForce::AnalyticData

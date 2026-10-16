@@ -12,7 +12,6 @@
 extern "C" {
 #include <effsource_equatorial.h>
 }
-#include <fftw3.h>
 #include <gsl/gsl_errno.h>
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_odeiv2.h>
@@ -20,6 +19,7 @@ extern "C" {
 #include <gsl/gsl_sf.h>
 #include <iomanip>
 #include <ios>
+#include <fstream>
 #include <stdexcept>
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,6 +78,22 @@ namespace {
       stalled = true;
       return lambda;
   }
+
+  // Trapezoid rule for m-mode and n-mode integrals
+  template<typename Type>
+  Type composite_trapezoid(
+      const std::vector<double>&x, 
+      const std::vector<Type> &field, double Tr)
+  {
+    Type sum = 0.0;
+    for (std::size_t i = 1; i < x.size(); ++i){
+      sum += 0.5 * (field[i - 1] + field[i]) * (x[i] - x[i - 1]);
+    }
+
+    //}
+    return sum / Tr;  
+  }
+
 } // namespace
 
 namespace ScalarSelfForce::AnalyticData {
@@ -125,7 +141,6 @@ EccentricOrbit::EccentricOrbit(const double black_hole_mass,
         "true.");
   }
   compute_trajectory(time_points_);
-  build_fftw_plan(phi_points_);
 }
 
 EccentricOrbit::EccentricOrbit(CkMigrateMessage* m)
@@ -144,69 +159,43 @@ tnsr::I<double, 2> EccentricOrbit::puncture_position() const {
   }
 }
 
-void EccentricOrbit::build_fftw_plan(size_t n_phi) {
-
-  fftw_complex* in_t = static_cast<fftw_complex*>(
-      fftw_malloc(sizeof(fftw_complex) * time_points_));
-  fftw_complex* out_t = static_cast<fftw_complex*>(
-      fftw_malloc(sizeof(fftw_complex) * time_points_));
-  fft_plan_t.reset(fftw_plan_dft_1d(static_cast<int>(time_points_), in_t,
-                                  out_t, FFTW_BACKWARD, FFTW_MEASURE));
-  //Use a real fft to calculate the m-mode projections 
-  size_t h = n_phi/2 + 1;
-  double* in_phi = static_cast<double*>(
-      fftw_malloc(sizeof(double) * n_phi));
-  fftw_complex* out_phi = static_cast<fftw_complex*>(
-      fftw_malloc(sizeof(fftw_complex) * h));
-  fft_plan_phi.reset(fftw_plan_dft_r2c_1d(static_cast<int>(n_phi), in_phi,
-        out_phi, FFTW_MEASURE));
-
-  fftw_free(in_t);
-  fftw_free(out_t);
-  fftw_free(in_phi);
-  fftw_free(out_phi);
-}
-
 // Function to compute n-modes of a Scalar<ComplexDataVector> time series
 ComplexDataVector EccentricOrbit::compute_n_mode(
     std::vector<Scalar<ComplexDataVector>>& time_series_data, size_t num_points) const {
   ComplexDataVector result;
   result.destructive_resize(num_points);
 
-  fftw_complex *in = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
-  fftw_complex *out = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
-
-  std::vector<Scalar<ComplexDataVector>> shifted_time_series;
-  shifted_time_series.resize(time_points());
   // Multiply the time series data by the phase in the Fourier integral
+  std::vector<Scalar<ComplexDataVector>> shifted_time_series(time_points_);
+  double frequency = m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r;
   for(size_t k=0; k < time_points(); k++)
   {
     get(shifted_time_series[k]).destructive_resize(num_points);
     get(shifted_time_series[k]) = get(time_series_data[k]) * 
-      std::exp(std::complex<double>(
-        0, m_mode_number_ * Omega_phi * t_values[k]));
+      std::complex<double>(
+        cos(frequency * t_values[k]),
+        sin(frequency * t_values[k]));
   }
 
+  double T_max = 2*M_PI / (Omega_r);
+  std::vector<double> t_closed(t_values.begin(), t_values.end());
+  t_closed.push_back(T_max);
+
+  std::vector<std::complex<double>> integrand(time_points_ + 1);
+  /* std::ofstream output("/home/cillian/debug/ScalarEffectiveSourceAccuracy/n_mode_integrand.dat");
+  output << "t\tRe\tIm\n"; */
   for(size_t i = 0; i < num_points; i++) {
     for (size_t j = 0; j < time_points(); j++) {
-      in[j][0] = get(shifted_time_series[j])[i].real();
-      in[j][1] = get(shifted_time_series[j])[i].imag();
+      integrand[j] = get(shifted_time_series[j])[i];//.real();
+      // Only need to do the real part of the integral here over half the period
+      // because real part is even about T/2 and imaginary part is odd
+      /* in[j][1] = get(shifted_time_series[j])[i].imag(); */
     }
-    // Execute the member plan for thread-safety
-    fftw_execute_dft(fft_plan_t.get(), in, out);
+    //output << t_values[j] << "\t" << integrand.real() << "\t" << integrand.real(); 
+    integrand[time_points_] = integrand[0];
 
-    //Normalize the output 
-    for(size_t k = 0; k < time_points(); k++)
-    {
-      out[k][0] /= time_points();
-      out[k][1] /= time_points();
-    }
-    const int int_tp = static_cast<int>(time_points());
-    int frequency_bin = ((n_mode_number_ % int_tp) + int_tp) % int_tp;
-    result[i] = std::complex<double>(out[frequency_bin][0], out[frequency_bin][1]);
+    result[i] = composite_trapezoid(t_closed, integrand, T_max);
   }
-  fftw_free(in);
-  fftw_free(out);
   return result;
 }
 
@@ -217,55 +206,43 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
   get<0>(result).destructive_resize(num_points);
   get<1>(result).destructive_resize(num_points);
 
-  fftw_complex *in_r = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
-  fftw_complex *in_th = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
-  fftw_complex *out_r = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
-  fftw_complex *out_th = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * time_points()));
-
-  std::vector<tnsr::i<ComplexDataVector, 2>> shifted_time_series;
-  shifted_time_series.resize(time_points());
-
   // Multiply the time series data by the phase in the Fourier integral
+  std::vector<tnsr::i<ComplexDataVector, 2>> shifted_time_series(time_points_);
+  double frequency = (m_mode_number_ * Omega_phi) + (n_mode_number_ * Omega_r);
   for(size_t k=0; k < time_points(); k++)
   {
     get<0>(shifted_time_series[k]).destructive_resize(num_points);
     get<1>(shifted_time_series[k]).destructive_resize(num_points);
     get<0>(shifted_time_series[k]) = get<0>(time_series_data[k]) * 
-      std::exp(std::complex<double>(
-        0, (m_mode_number_ * Omega_phi * t_values[k])));
+      std::complex<double>(
+        cos(frequency * t_values[k]),
+        sin(frequency * t_values[k]));
     get<1>(shifted_time_series[k]) = get<1>(time_series_data[k]) * 
-      std::exp(std::complex<double>(
-        0, (m_mode_number_ * Omega_phi * t_values[k])));
+      std::complex<double>(
+        cos(frequency * t_values[k]),
+        sin(frequency * t_values[k]));
   }
 
-  //May need to check this
+  double T_max = 2*M_PI / (Omega_r);
+  std::vector<double> t_closed(t_values.begin(), t_values.end());
+  t_closed.push_back(T_max);
+
+  std::vector<std::complex<double>> integrand_dr(time_points_ + 1);
+  std::vector<std::complex<double>> integrand_dtheta(time_points_ + 1);
   for(size_t i = 0; i < num_points; i++) {
     for (size_t j = 0; j < time_points(); j++) {
-      in_r[j][0] = get<0>(shifted_time_series[j])[i].real();
-      in_r[j][1] = get<0>(shifted_time_series[j])[i].imag();
-      in_th[j][0] = get<1>(shifted_time_series[j])[i].real();
-      in_th[j][1] = get<1>(shifted_time_series[j])[i].imag();
+      integrand_dr[j] = get<0>(shifted_time_series[j])[i];//.real();
+      integrand_dtheta[j] = get<1>(shifted_time_series[j])[i];//.real();
     }
-    fftw_execute_dft(fft_plan_t.get(), in_r, out_r);
-    fftw_execute_dft(fft_plan_t.get(), in_th, out_th);
 
-    //Normalize the output 
-    for(size_t k = 0; k < time_points(); k++)
-    {
-      out_r[k][0] /= time_points();
-      out_r[k][1] /= time_points();
-      out_th[k][0] /= time_points();
-      out_th[k][1] /= time_points();
-    }
-    const int int_tp = static_cast<int>(time_points());
-    int frequency_bin = ((n_mode_number_ % int_tp) + int_tp) % int_tp;
-    get<0>(result)[i] = std::complex<double>(out_r[frequency_bin][0], out_r[frequency_bin][1]);
-    get<1>(result)[i] = std::complex<double>(out_th[frequency_bin][0], out_th[frequency_bin][1]);
+    //Copy the last point to close the intervar
+    integrand_dr[time_points_] = integrand_dr[0];
+    integrand_dtheta[time_points_] = integrand_dtheta[0];
+
+    // Compute the integral
+    get<0>(result)[i] = composite_trapezoid(t_closed, integrand_dr, T_max);
+    get<1>(result)[i] = composite_trapezoid(t_closed, integrand_dtheta, T_max);
   }
-  fftw_free(in_r);
-  fftw_free(out_r);
-  fftw_free(in_th);
-  fftw_free(out_th);
   return result;
 }
 
@@ -325,7 +302,7 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
     xp.t = t_values[i];
     xp.r = r_of_t[i];
     xp.theta = M_PI_2;
-    xp.phi = 0; //we set xp.phi to zero here for the fft and rescale after phi_of_t[i];
+    xp.phi = 0;
     struct effsource_equatorial_ctx * ctx = effsource_equatorial_create(black_hole_mass_, black_hole_spin_);
     effsource_equatorial_ctx_set_particle(ctx, &xp, energy, angular_momentum, u_r[i]);
     source_coefficients[i] = ctx;
@@ -567,79 +544,74 @@ EccentricOrbit::variables(
   {
     // Call into effsource
     coordinate x_i{};
-    /* std::array<double, 2> PhiS{};
-    std::array<double, 8> dPhiS_dx{};
-    std::array<double, 20> d2PhiS_dx2{};
-    std::array<double, 2> src{}; */
-    double PhiS;
+    double PhiS=0;
     std::array<double, 4> dPhiS{};
     std::array<double, 10> d2PhiS{};
-    double src;
+    double src=0;
 
-    // Declare the input and output arrays for the m-mode FFT
-    double * in_PhiS = static_cast<double*>(fftw_malloc(sizeof(double) * phi_points_));
-    double * in_dPhiS_dr = static_cast<double*>(fftw_malloc(sizeof(double) * phi_points_));
-    double * in_dPhiS_dtheta = static_cast<double*>(fftw_malloc(sizeof(double) * phi_points_));
-    double * in_src = static_cast<double*>(fftw_malloc(sizeof(double) * phi_points_));
-
-    size_t h = phi_points_ / 2 + 1;
-    fftw_complex *out_PhiS = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * h));
-    fftw_complex *out_dPhi_dr = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * h));
-    fftw_complex *out_dPhi_dtheta = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * h));
-    fftw_complex *out_src = static_cast<fftw_complex*>(fftw_malloc(sizeof(fftw_complex) * h));
-
+    std::vector<std::complex<double>> PhiS4D(phi_points_+1);
+    std::vector<std::complex<double>> dPhiS_dr4D(phi_points_+1);
+    std::vector<std::complex<double>> dPhiS_dtheta4D(phi_points_+1);
+    std::vector<std::complex<double>> src4D(phi_points_+1);
+    std::vector<double> phi_grid(phi_points_+1);
+    for(size_t k=0;k<=phi_points_;k++)
+    {
+      phi_grid[k] = 2.0 * M_PI * static_cast<double>(k) / 
+        static_cast<double>(phi_points_);
+    }
     for (size_t i = 0; i < time_points(); i++) {
       for (size_t j = 0; j < num_points; j++) {
         x_i.t = t_values[i];
         x_i.r = r[j];
         x_i.theta = acos(cos_theta[j]);
 
-        // Populate the input arrays for the m-mode FFT
+        // Populate the input arrays for the m-mode integrals
         for (size_t k = 0; k < phi_points_; k++) {
-          x_i.phi = 2.0 * M_PI * (double)k / (double)phi_points_;
+          x_i.phi = phi_grid[k];
           effsource_equatorial_ctx_calc(source_coefficients[i], &x_i, &PhiS, dPhiS.data(), d2PhiS.data(), &src);
           if(on_worldtube_boundary){
-            in_PhiS[k] = PhiS;
-            in_dPhiS_dr[k] = dPhiS[1];
-            in_dPhiS_dtheta[k] = dPhiS[2];
+            PhiS4D[k] = PhiS*(
+                std::complex(cos(m_mode_number_*phi_grid[k]),
+                  -sin(m_mode_number_*phi_grid[k])));
+            dPhiS_dr4D[k] = dPhiS[1]*(
+                std::complex(cos(m_mode_number_*phi_grid[k]),
+                  -sin(m_mode_number_*phi_grid[k])));
+            dPhiS_dtheta4D[k] = dPhiS[2]*(
+                std::complex(cos(m_mode_number_*phi_grid[k]),
+                  -sin(m_mode_number_*phi_grid[k])));
           }
-          in_src[k] = src;
+          src4D[k] = src*(
+                std::complex(cos(m_mode_number_*phi_grid[k]),
+                  -sin(m_mode_number_*phi_grid[k])));
         }
-        if(on_worldtube_boundary){
-          fftw_execute_dft_r2c(fft_plan_phi.get(), in_PhiS, out_PhiS);
-          fftw_execute_dft_r2c(fft_plan_phi.get(), in_dPhiS_dr, out_dPhi_dr);
-          fftw_execute_dft_r2c(fft_plan_phi.get(), in_dPhiS_dtheta, out_dPhi_dtheta);
+        //Copy the closing point 
+        src4D[phi_points_] = src4D[0];
+        if(on_worldtube_boundary)
+        {
+           PhiS4D[phi_points_] = PhiS4D[0];
+           dPhiS_dr4D[phi_points_] = dPhiS_dr4D[0];
+           dPhiS_dtheta4D[phi_points_] = dPhiS_dtheta4D[0];
         }
-        fftw_execute_dft_r2c(fft_plan_phi.get(), in_src, out_src);
-
-        // Rescale and rotate to account for setting phi_p = 0
-        double w = 2.0 * M_PI / (double)phi_points_;
-        double cm = cos(m_mode_number_ * phi_of_t[i]); 
-        double sm = sin(m_mode_number_ * phi_of_t[i]);
 
         if(on_worldtube_boundary){
-          double re_PhiS = out_PhiS[m_mode_number_][0], im_PhiS = out_PhiS[m_mode_number_][1];
-          double re_dPhiS_dr= out_dPhi_dr[m_mode_number_][0], im_dPhiS_dr = out_dPhi_dr[m_mode_number_][1];
-          double re_dPhiS_dtheta = out_dPhi_dtheta[m_mode_number_][0], im_dPhiS_dtheta = out_dPhi_dtheta[m_mode_number_][1];
-          out_PhiS[m_mode_number_][0] = w * (re_PhiS* cm + im_PhiS * sm);
-          out_PhiS[m_mode_number_][1] = w * (im_PhiS* cm - re_PhiS * sm);
-          out_dPhi_dr[m_mode_number_][0] = w * (re_dPhiS_dr* cm + im_dPhiS_dr * sm);
-          out_dPhi_dr[m_mode_number_][1] = w * (im_dPhiS_dr* cm - re_dPhiS_dr * sm);
-          out_dPhi_dtheta[m_mode_number_][0] = w * (re_dPhiS_dtheta* cm + im_dPhiS_dtheta * sm);
-          out_dPhi_dtheta[m_mode_number_][1] = w * (im_dPhiS_dtheta* cm - re_dPhiS_dtheta * sm);
-          get(snapshot_singular_field)[j] =
-              out_PhiS[m_mode_number_][0] + std::complex<double>(0., 1.) * out_PhiS[m_mode_number_][1];
+          get(snapshot_singular_field)[j] = 
+            2*M_PI*std::complex<double>(
+                cos(m_mode_number_*phi_of_t[i]),-sin(m_mode_number_*phi_of_t[i])
+                )*composite_trapezoid(phi_grid, PhiS4D, 2*M_PI);
           get<0>(snapshot_deriv_singular_field)[j] =
-              out_dPhi_dr[m_mode_number_][0] + std::complex<double>(0., 1.) * out_dPhi_dr[m_mode_number_][1];
+            2*M_PI*std::complex<double>(
+                cos(m_mode_number_*phi_of_t[i]),-sin(m_mode_number_*phi_of_t[i])
+                )*composite_trapezoid(phi_grid, dPhiS_dr4D, 2*M_PI);
           get<1>(snapshot_deriv_singular_field)[j] =
-              out_dPhi_dtheta[m_mode_number_][0] + std::complex<double>(0., 1.) * out_dPhi_dtheta[m_mode_number_][1];
+            2*M_PI*std::complex<double>(
+                cos(m_mode_number_*phi_of_t[i]),-sin(m_mode_number_*phi_of_t[i])
+                )*composite_trapezoid(phi_grid, dPhiS_dtheta4D, 2*M_PI);
         }
 
-        double re_src = out_src[m_mode_number_][0], im_src= out_src[m_mode_number_][1];
-        out_src[m_mode_number_][0] = w * (re_src* cm + im_src* sm);
-        out_src[m_mode_number_][1] = w * (im_src* cm - re_src* sm);
         get(snapshot_effective_source)[j] =
-            out_src[m_mode_number_][0] + std::complex<double>(0., 1.) * out_src[m_mode_number_][1];
+          2*M_PI*std::complex<double>(
+                cos(m_mode_number_*phi_of_t[i]),-sin(m_mode_number_*phi_of_t[i])
+                )*composite_trapezoid(phi_grid, src4D, 2*M_PI);
       }
 
       // Rotate the source by delta_phi and multiply by r / 2 pi
@@ -689,14 +661,6 @@ EccentricOrbit::variables(
         get<1>(deriv_singular_field_evolution[i]) += add_term;
       }
     }
-    fftw_free(in_PhiS);
-    fftw_free(in_dPhiS_dr);
-    fftw_free(in_dPhiS_dtheta);
-    fftw_free(in_src);
-    fftw_free(out_PhiS);
-    fftw_free(out_dPhi_dr);
-    fftw_free(out_dPhi_dtheta);
-    fftw_free(out_src);
   }
 
   // only compute the n_modes of the singular field and its derivatives when 
@@ -738,7 +702,6 @@ void EccentricOrbit::pup(PUP::er& p) {
   p | angular_momentum;
 
   if (p.isUnpacking()) {
-    build_fftw_plan(phi_points_);
     source_coefficients.resize(time_points());
     for(size_t i=0; i<time_points(); i++)
     {
@@ -746,7 +709,7 @@ void EccentricOrbit::pup(PUP::er& p) {
       xp.t = t_values[i];
       xp.r = r_of_t[i];
       xp.theta = M_PI_2;
-      xp.phi = 0; //we set xp.phi to zero here for the fft and rescale after phi_of_t[i];
+      xp.phi = phi_of_t[i];
       struct effsource_equatorial_ctx * ctx = effsource_equatorial_create(black_hole_mass_, black_hole_spin_);
       effsource_equatorial_ctx_set_particle(ctx, &xp, energy, angular_momentum, u_r[i]);
       source_coefficients[i] = ctx;
