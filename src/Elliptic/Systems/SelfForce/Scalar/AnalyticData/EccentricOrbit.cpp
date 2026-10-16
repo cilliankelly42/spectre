@@ -19,7 +19,6 @@ extern "C" {
 #include <gsl/gsl_sf.h>
 #include <iomanip>
 #include <ios>
-#include <fstream>
 #include <stdexcept>
 #include <stdio.h>
 #include <stdlib.h>
@@ -166,35 +165,21 @@ ComplexDataVector EccentricOrbit::compute_n_mode(
   result.destructive_resize(num_points);
 
   // Multiply the time series data by the phase in the Fourier integral
-  std::vector<Scalar<ComplexDataVector>> shifted_time_series(time_points_);
-  double frequency = m_mode_number_ * Omega_phi + n_mode_number_ * Omega_r;
-  for(size_t k=0; k < time_points(); k++)
-  {
-    get(shifted_time_series[k]).destructive_resize(num_points);
-    get(shifted_time_series[k]) = get(time_series_data[k]) * 
-      std::complex<double>(
-        cos(frequency * t_values[k]),
-        sin(frequency * t_values[k]));
+  double frequency = (m_mode_number_ * Omega_phi) + (n_mode_number_ * Omega_r);
+
+  std::vector<std::complex<double>> integrand(time_points_);
+  std::vector<std::complex<double>> phase(time_points_);
+  for (size_t j = 0; j < time_points_; ++j) {
+    phase[j] = {cos(frequency * t_values[j]), sin(frequency * t_values[j])};
   }
 
-  double T_max = 2*M_PI / (Omega_r);
-  std::vector<double> t_closed(t_values.begin(), t_values.end());
-  t_closed.push_back(T_max);
-
-  std::vector<std::complex<double>> integrand(time_points_ + 1);
-  /* std::ofstream output("/home/cillian/debug/ScalarEffectiveSourceAccuracy/n_mode_integrand.dat");
-  output << "t\tRe\tIm\n"; */
   for(size_t i = 0; i < num_points; i++) {
     for (size_t j = 0; j < time_points(); j++) {
-      integrand[j] = get(shifted_time_series[j])[i];//.real();
       // Only need to do the real part of the integral here over half the period
       // because real part is even about T/2 and imaginary part is odd
-      /* in[j][1] = get(shifted_time_series[j])[i].imag(); */
+      integrand[j] = (get(time_series_data[j])[i]*phase[j]).real();
     }
-    //output << t_values[j] << "\t" << integrand.real() << "\t" << integrand.real(); 
-    integrand[time_points_] = integrand[0];
-
-    result[i] = composite_trapezoid(t_closed, integrand, T_max);
+    result[i] = composite_trapezoid(t_values, integrand, t_values[time_points_ - 1]);
   }
   return result;
 }
@@ -207,41 +192,27 @@ tnsr::i<ComplexDataVector, 2> EccentricOrbit::compute_n_mode(
   get<1>(result).destructive_resize(num_points);
 
   // Multiply the time series data by the phase in the Fourier integral
-  std::vector<tnsr::i<ComplexDataVector, 2>> shifted_time_series(time_points_);
   double frequency = (m_mode_number_ * Omega_phi) + (n_mode_number_ * Omega_r);
-  for(size_t k=0; k < time_points(); k++)
-  {
-    get<0>(shifted_time_series[k]).destructive_resize(num_points);
-    get<1>(shifted_time_series[k]).destructive_resize(num_points);
-    get<0>(shifted_time_series[k]) = get<0>(time_series_data[k]) * 
-      std::complex<double>(
-        cos(frequency * t_values[k]),
-        sin(frequency * t_values[k]));
-    get<1>(shifted_time_series[k]) = get<1>(time_series_data[k]) * 
-      std::complex<double>(
-        cos(frequency * t_values[k]),
-        sin(frequency * t_values[k]));
+  std::vector<std::complex<double>> phase(time_points_);
+  for (size_t j = 0; j < time_points_; ++j) {
+    phase[j] = {cos(frequency * t_values[j]), sin(frequency * t_values[j])};
   }
 
-  double T_max = 2*M_PI / (Omega_r);
-  std::vector<double> t_closed(t_values.begin(), t_values.end());
-  t_closed.push_back(T_max);
-
-  std::vector<std::complex<double>> integrand_dr(time_points_ + 1);
-  std::vector<std::complex<double>> integrand_dtheta(time_points_ + 1);
+  std::vector<std::complex<double>> integrand_dr(time_points_);
+  std::vector<std::complex<double>> integrand_dtheta(time_points_);
   for(size_t i = 0; i < num_points; i++) {
     for (size_t j = 0; j < time_points(); j++) {
-      integrand_dr[j] = get<0>(shifted_time_series[j])[i];//.real();
-      integrand_dtheta[j] = get<1>(shifted_time_series[j])[i];//.real();
+      integrand_dr[j] = (get<0>(time_series_data[j])[i] * phase[j]).real();
+      integrand_dtheta[j] = (get<1>(time_series_data[j])[i] * phase[j]).real();
     }
 
     //Copy the last point to close the intervar
-    integrand_dr[time_points_] = integrand_dr[0];
-    integrand_dtheta[time_points_] = integrand_dtheta[0];
+    /* integrand_dr[time_points_] = integrand_dr[0];
+    integrand_dtheta[time_points_] = integrand_dtheta[0]; */
 
     // Compute the integral
-    get<0>(result)[i] = composite_trapezoid(t_closed, integrand_dr, T_max);
-    get<1>(result)[i] = composite_trapezoid(t_closed, integrand_dtheta, T_max);
+    get<0>(result)[i] = composite_trapezoid(t_values, integrand_dr, t_values[time_points_ - 1]);
+    get<1>(result)[i] = composite_trapezoid(t_values, integrand_dtheta, t_values[time_points_ - 1]);
   }
   return result;
 }
@@ -271,17 +242,17 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
   source_coefficients.resize(time_points);
 
   // Only half of the period radial period is required because fields are periodic
-  double T_max = 2*M_PI / (orbpar.wr);
+  double T_max = M_PI / (orbpar.wr);
 
   // Compute the radial four velocity at each time
   double X_four_velocity = orbpar.Lz - (black_hole_spin_ * orbpar.E);
   double lambda = 0;
   for (size_t i = 0; i < time_points_; i++) {
-    double t = static_cast<double>(i) / time_points_ * T_max;
+    double t = static_cast<double>(i) / (time_points_ - 1) * T_max;
     t_values[i] = t;
     bool stalled=false;
     lambda = lambda_from_t(
-        t, lambda + (T_max/time_points_)/(dtdlambda(lambda, orbpar)), 
+        t, lambda + (T_max/(time_points_ - 1))/(dtdlambda(lambda, orbpar)), 
         orbpar, stalled);
     phi_of_t[i] = korb_phifromla(lambda, orbpar);
     double psi_of_t = korb_psifromla(lambda, orbpar);
@@ -302,7 +273,7 @@ void EccentricOrbit::compute_trajectory(size_t time_points) {
     xp.t = t_values[i];
     xp.r = r_of_t[i];
     xp.theta = M_PI_2;
-    xp.phi = 0;
+    xp.phi = phi_of_t[i];
     struct effsource_equatorial_ctx * ctx = effsource_equatorial_create(black_hole_mass_, black_hole_spin_);
     effsource_equatorial_ctx_set_particle(ctx, &xp, energy, angular_momentum, u_r[i]);
     source_coefficients[i] = ctx;
@@ -523,8 +494,6 @@ EccentricOrbit::variables(
   singular_field_evolution.resize(time_points());
   std::vector<tnsr::i<ComplexDataVector, 2>> deriv_singular_field_evolution;
   deriv_singular_field_evolution.resize(time_points());
-  std::vector<Scalar<ComplexDataVector>> raw_source_evolution;
-  raw_source_evolution.resize(time_points());
 
   // Resize the inner array in the time evolutions
   for (auto& inner_array : singular_field_evolution) {
@@ -537,10 +506,6 @@ EccentricOrbit::variables(
   for (auto& inner_array : effective_source_evolution) {
     get(inner_array).destructive_resize(num_points);
   }
-  for (auto& inner_array : raw_source_evolution) {
-    get(inner_array).destructive_resize(num_points);
-  }
-
   {
     // Call into effsource
     coordinate x_i{};
@@ -595,71 +560,23 @@ EccentricOrbit::variables(
 
         if(on_worldtube_boundary){
           get(snapshot_singular_field)[j] = 
-            2*M_PI*std::complex<double>(
-                cos(m_mode_number_*phi_of_t[i]),-sin(m_mode_number_*phi_of_t[i])
-                )*composite_trapezoid(phi_grid, PhiS4D, 2*M_PI);
+            2*M_PI * composite_trapezoid(phi_grid, PhiS4D, 2*M_PI);
           get<0>(snapshot_deriv_singular_field)[j] =
-            2*M_PI*std::complex<double>(
-                cos(m_mode_number_*phi_of_t[i]),-sin(m_mode_number_*phi_of_t[i])
-                )*composite_trapezoid(phi_grid, dPhiS_dr4D, 2*M_PI);
+            2*M_PI* composite_trapezoid(phi_grid, dPhiS_dr4D, 2*M_PI);
           get<1>(snapshot_deriv_singular_field)[j] =
-            2*M_PI*std::complex<double>(
-                cos(m_mode_number_*phi_of_t[i]),-sin(m_mode_number_*phi_of_t[i])
-                )*composite_trapezoid(phi_grid, dPhiS_dtheta4D, 2*M_PI);
+            2*M_PI* composite_trapezoid(phi_grid, dPhiS_dtheta4D, 2*M_PI);
         }
 
         get(snapshot_effective_source)[j] =
-          2*M_PI*std::complex<double>(
-                cos(m_mode_number_*phi_of_t[i]),-sin(m_mode_number_*phi_of_t[i])
-                )*composite_trapezoid(phi_grid, src4D, 2*M_PI);
+          2*M_PI* composite_trapezoid(phi_grid, src4D, 2*M_PI);
       }
 
-      // Rotate the source by delta_phi and multiply by r / 2 pi
       get(effective_source_evolution[i]) = get(snapshot_effective_source);
-      get(raw_source_evolution[i]) = get(snapshot_effective_source);
-
       get(singular_field_evolution[i]) = get(snapshot_singular_field);
       get<0>(deriv_singular_field_evolution[i]) =
           get<0>(snapshot_deriv_singular_field);
       get<1>(deriv_singular_field_evolution[i]) =
           get<1>(snapshot_deriv_singular_field);
-
-      get(effective_source_evolution[i]) *= rotation * 0.5 * r / M_PI;
-      // Factor Delta * (r^2 + a^2 cos^2(theta)) / Sigma^2
-      // Factor Sigma^2 / (r^2 + a^2)^2 from first-order formulation
-      // Factor 1/sin(theta)^m from change of variables
-      get(effective_source_evolution[i]) *= (square(r) + square(a) * cos_theta_sq) /
-                           (r_sq_plus_a_sq * sin_theta_pow_m);
-      if (not penetrating_horizon_) {
-        get(effective_source_evolution[i]) *= delta / r_sq_plus_a_sq;
-      }
-
-      get(singular_field_evolution[i]) *= rotation * 0.5 * r / M_PI / sin_theta_pow_m;
-      get<0>(deriv_singular_field_evolution[i]) *= rotation * 0.5 * r / M_PI / sin_theta_pow_m;
-      get<0>(deriv_singular_field_evolution[i]) +=
-          get(singular_field_evolution[i]) / r - std::complex<double>(0., a * m_mode_number_) /
-            delta * get(singular_field_evolution[i]);
-
-      if (not penetrating_horizon_) {
-        get<0>(deriv_singular_field_evolution[i]) *= delta / r_sq_plus_a_sq;
-      }
-
-      get<1>(deriv_singular_field_evolution[i]) *= rotation * 0.5 * r / M_PI / sin_theta_pow_m;
-      get<1>(deriv_singular_field_evolution[i]) /= -sin_theta;
-      if (impose_equatorial_symmetry_) {
-        get<1>(deriv_singular_field_evolution[i]) /= 2. * cos_theta;
-      }
-
-      {
-        ComplexDataVector add_term =
-            m_mode_number_ * get(singular_field_evolution[i]) / sin_theta_sq;
-        if (impose_equatorial_symmetry_) {
-          add_term *= 0.5;
-        } else {
-          add_term *= cos_theta;
-        }
-        get<1>(deriv_singular_field_evolution[i]) += add_term;
-      }
     }
   }
 
@@ -674,6 +591,46 @@ EccentricOrbit::variables(
 
   get(effective_source) =
     compute_n_mode(effective_source_evolution, num_points);
+
+  // Rotate the source by delta_phi and multiply by r / 2 pi
+  get(effective_source) *= rotation * 0.5 * r / M_PI;
+  // Factor Delta * (r^2 + a^2 cos^2(theta)) / Sigma^2
+  // Factor Sigma^2 / (r^2 + a^2)^2 from first-order formulation
+  // Factor 1/sin(theta)^m from change of variables
+  get(effective_source) *= (square(r) + square(a) * cos_theta_sq) /
+                       (r_sq_plus_a_sq * sin_theta_pow_m);
+  if (not penetrating_horizon_) {
+    get(effective_source) *= delta / r_sq_plus_a_sq;
+  }
+  if(on_worldtube_boundary)
+  {
+    get(singular_field) *= rotation * 0.5 * r / M_PI / sin_theta_pow_m;
+    get<0>(deriv_singular_field) *= rotation * 0.5 * r / M_PI / sin_theta_pow_m;
+    get<0>(deriv_singular_field) +=
+        get(singular_field) / r - std::complex<double>(0., a * m_mode_number_) /
+          delta * get(singular_field);
+
+    if (not penetrating_horizon_) {
+      get<0>(deriv_singular_field) *= delta / r_sq_plus_a_sq;
+    }
+
+    get<1>(deriv_singular_field) *= rotation * 0.5 * r / M_PI / sin_theta_pow_m;
+    get<1>(deriv_singular_field) /= -sin_theta;
+    if (impose_equatorial_symmetry_) {
+      get<1>(deriv_singular_field) /= 2. * cos_theta;
+    }
+
+    {
+      ComplexDataVector add_term =
+          m_mode_number_ * get(singular_field) / sin_theta_sq;
+      if (impose_equatorial_symmetry_) {
+        add_term *= 0.5;
+      } else {
+        add_term *= cos_theta;
+      }
+      get<1>(deriv_singular_field) += add_term;
+    }
+  }
 
   return result;
 }
