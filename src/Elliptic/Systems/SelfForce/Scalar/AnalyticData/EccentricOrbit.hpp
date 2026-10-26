@@ -4,12 +4,12 @@
 #pragma once
 
 #include <array>
+#include <complex>
 #include <cstddef>
 extern "C" {
     #include <effsource_equatorial.h>
 }
 #include <limits>
-#include <memory>
 #include <optional>
 #include <pup.h>
 #include <vector>
@@ -36,6 +36,101 @@ extern "C" {
 #include "DataStructures/TaggedTuple.hpp"
 
 namespace ScalarSelfForce::AnalyticData {
+
+namespace EccentricOrbit_detail {
+/*!
+ * \brief Number of azimuthal samples for one time sample of the numerical
+ * m-mode projection.
+ *
+ * \details The trapezoidal sum over the field azimuth converges like
+ * \f$\rho^{-(N_\phi - m)}\f$ with
+ *
+ * \f{align*}{
+ * \log\rho = \log\left(1 + 2 C_1 + 2 \sqrt{C_1 (1 + C_1)}\right),
+ * \quad
+ * C_1 = \frac{\alpha_{20}\,\delta r^2 + \alpha_{02}\,\delta\theta^2}{\beta},
+ * \f}
+ *
+ * where \f$C_1\f$ measures the separation of the field point from the particle
+ * and \f$\alpha_{20}\f$, \f$\alpha_{02}\f$ and \f$\beta\f$ are the puncture
+ * coefficients of the particle at that time. The function returns
+ * `effsource_equatorial_numerical_num_phi`, the smallest power of two that is
+ * at least \f$\max(64, \max(m, 20) + 46 / \log\rho, 5 m / 2)\f$. For
+ * \f$m \le 20\f$ and \f$C_1\f$ from \f$10^{-9}\f$ to 1 the quadrature error
+ * of the m-mode of the effective source is then below \f$10^{-14}\f$ of the
+ * integral of its absolute value over \f$\phi\f$.
+ *
+ * It is an error if \f$C_1 \le 0\f$ (the field point is on the particle) or if
+ * the result exceeds \f$2^{22}\f$.
+ */
+size_t phi_points_for_sample(double c1, int m_mode_number);
+
+/// The m-modes of the effective source and of the singular field and its
+/// derivatives at one field point for one particle position
+struct MModes {
+  std::complex<double> effective_source{};
+  std::complex<double> singular_field{};
+  std::complex<double> deriv_r_singular_field{};
+  std::complex<double> deriv_theta_singular_field{};
+};
+
+/*!
+ * \brief The azimuthal node values of the numerical m-mode projection for one
+ * \f$|m|\f$, shared by the field points and time samples of one call of
+ * `EccentricOrbit::variables`.
+ *
+ * \details `get(num_phi)` rebuilds the table for `num_phi` nodes if it holds
+ * fewer, and otherwise returns the present table, which
+ * `effsource_equatorial_ctx_numerical_src_mode` reads with a stride. All node
+ * counts are powers of two, so every count divides the largest one.
+ */
+class PhiTable {
+ public:
+  explicit PhiTable(int m_mode_number);
+  PhiTable(const PhiTable&) = delete;
+  PhiTable& operator=(const PhiTable&) = delete;
+  PhiTable(PhiTable&&) = delete;
+  PhiTable& operator=(PhiTable&&) = delete;
+  ~PhiTable();
+
+  int abs_m_mode_number() const { return abs_m_mode_number_; }
+  const effsource_equatorial_numerical_table& get(size_t num_phi);
+
+ private:
+  int abs_m_mode_number_;
+  effsource_equatorial_numerical_table table_{};
+};
+
+/*!
+ * \brief The m-modes of the effective source and of the singular field and its
+ * derivatives at the field point \f$(r, \theta)\f$ for the particle in `ctx`.
+ *
+ * \details The modes are
+ *
+ * \f{align*}{
+ * f_m = \int_0^{2\pi} f(r, \theta, \phi)\, e^{-i m \phi}\, d\phi,
+ * \f}
+ *
+ * where \f$f\f$ is the effective source, the singular field, or the derivative
+ * of the singular field with respect to \f$r\f$ or \f$\theta\f$ at fixed
+ * \f$t\f$ and \f$\phi\f$, all in Boyer-Lindquist coordinates. They are
+ * trapezoidal sums over `phi_points` azimuthal samples, or over
+ * `phi_points_for_sample` samples if `phi_points` has no value, centred on the
+ * particle and evaluated from the coefficients of
+ * `effsource_equatorial_ctx_prepare` (see
+ * `effsource_equatorial_ctx_numerical_src_mode` and
+ * `effsource_equatorial_ctx_numerical_field_modes`). `phi_table` must have
+ * been constructed for \f$|m|\f$.
+ *
+ * The singular field and its derivatives are only computed if `singular_field`
+ * is true, and are zero otherwise. It is an error if the field point is on the
+ * particle or if `phi_points` is not a power of two of at least 4.
+ */
+MModes m_modes(gsl::not_null<PhiTable*> phi_table,
+               const effsource_equatorial_ctx& ctx, double r, double theta,
+               int m_mode_number, bool singular_field,
+               std::optional<size_t> phi_points);
+}  // namespace EccentricOrbit_detail
 
 class EccentricOrbit : public SelfForceBackground,
                       public elliptic::analytic_data::InitialGuess {
@@ -103,16 +198,21 @@ class EccentricOrbit : public SelfForceBackground,
     using type = size_t;
   };
   struct PhiPoints {
-      static constexpr Options::String help = 
-          "Specify the number of points used for the phi resolution in the "
-          "numerical m-mode calculation of the effective soure, puncture and "
-          "its derivatives.";
-      using type = size_t;
+    static constexpr Options::String help =
+        "Number of azimuthal samples per time sample in the numerical m-mode "
+        "projection of the effective source, the puncture and its "
+        "derivatives. 'Auto' chooses the number for each time sample and "
+        "field point from the separation of the field point and the "
+        "particle (see EccentricOrbit_detail::phi_points_for_sample). A "
+        "number, which must be a power of two, uses that fixed count for "
+        "every sample.";
+    using type = Options::Auto<size_t>;
   };
   using options =
       tmpl::list<BlackHoleMass, BlackHoleSpin, SemiLatusRectum, Eccentricity,
-        MModeNumber, NModeNumber, HyperboloidalSlicingTransitions,
-        PenetratingHorizon, ImposeEquatorialSymmetry, TimePoints, PhiPoints>;
+                 MModeNumber, NModeNumber, HyperboloidalSlicingTransitions,
+                 PenetratingHorizon, ImposeEquatorialSymmetry, TimePoints,
+                 PhiPoints>;
   static constexpr Options::String help =
       "Quasicircular orbit of a scalar point charge in Kerr spacetime";
 
@@ -133,10 +233,8 @@ class EccentricOrbit : public SelfForceBackground,
       double black_hole_mass, double black_hole_spin, double semi_latus_rectum,
       double eccentricity, int m_mode_number, int n_mode_number,
       std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions,
-      bool penetrating_horizon, 
-      bool impose_equatorial_symmetry, 
-      size_t time_points,
-      size_t phi_points);
+      bool penetrating_horizon, bool impose_equatorial_symmetry,
+      size_t time_points, std::optional<size_t> phi_points);
 
   explicit EccentricOrbit(CkMigrateMessage* m);
   using PUP::able::register_constructor;
@@ -153,13 +251,13 @@ class EccentricOrbit : public SelfForceBackground,
   int m_mode_number() const override { return m_mode_number_; }
   int n_mode_number() const override { return n_mode_number_ ; }
   size_t time_points() const { return time_points_; }
-  size_t phi_points() const { return phi_points_; }
+  std::optional<size_t> phi_points() const { return phi_points_; }
   std::optional<std::array<double, 4>> hyperboloidal_slicing_transitions()
       const {
     return hyperboloidal_slicing_transitions_;
   }
   bool penetrating_horizon() const override { return penetrating_horizon_; }
-  bool impose_equatorial_symmetry() const {
+  bool impose_equatorial_symmetry() const override {
     return impose_equatorial_symmetry_;
   }
 
@@ -191,14 +289,6 @@ class EccentricOrbit : public SelfForceBackground,
     return variables(x, tmpl::list<RequestedTags...>{});
   }
 
-  ComplexDataVector compute_n_mode(
-      std::vector<Scalar<ComplexDataVector>>& time_series_data,
-      size_t num_points) const;
-
-  tnsr::i<ComplexDataVector, 2> compute_n_mode(
-      std::vector<tnsr::i<ComplexDataVector, 2>>& time_series_data,
-      size_t num_points) const;
-
   void compute_trajectory(size_t time_points);
 
   // NOLINTNEXTLINE
@@ -212,10 +302,15 @@ class EccentricOrbit : public SelfForceBackground,
   std::vector<double> phi_of_t;
   std::vector<double> t_values;
   std::vector<double> u_r;
+  // Effective source coefficients for the time points in the first half of
+  // the radial period, `t_values[0]` to `t_values[time_points / 2]`. The
+  // second half follows from time-reversal symmetry.
   std::vector<effsource_equatorial_ctx*> source_coefficients;
 
  private:
   friend bool operator==(const EccentricOrbit& lhs, const EccentricOrbit& rhs);
+
+  void create_source_coefficients();
 
   double black_hole_mass_{std::numeric_limits<double>::signaling_NaN()};
   double black_hole_spin_{std::numeric_limits<double>::signaling_NaN()};
@@ -228,7 +323,7 @@ class EccentricOrbit : public SelfForceBackground,
   bool penetrating_horizon_{false};
   bool impose_equatorial_symmetry_{false};
   size_t time_points_{};
-  size_t phi_points_{};
+  std::optional<size_t> phi_points_{};
   };
 
 bool operator!=(const EccentricOrbit& lhs, const EccentricOrbit& rhs);

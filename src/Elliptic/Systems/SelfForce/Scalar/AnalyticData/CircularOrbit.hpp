@@ -231,9 +231,9 @@ class CircularOrbit : public SelfForceBackground,
   WRAPPED_PUPable_decl_template(CircularOrbit);
 
   double omega_phi() const override {
-    return 1. / (black_hole_spin_ + 
+    return 1. / (black_hole_spin_ +
         sqrt(cube(orbital_radius_) / black_hole_mass_));
-    } 
+    }
   double omega_r() const override { return 0; }
   tnsr::I<double, 2> puncture_position() const override;
   double black_hole_mass() const override { return black_hole_mass_; }
@@ -248,7 +248,7 @@ class CircularOrbit : public SelfForceBackground,
     return hyperboloidal_slicing_transitions_;
   }
   bool penetrating_horizon() const override { return penetrating_horizon_; }
-  bool impose_equatorial_symmetry() const {
+  bool impose_equatorial_symmetry() const override {
     return impose_equatorial_symmetry_;
   }
 
